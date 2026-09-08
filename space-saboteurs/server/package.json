@@ -1,0 +1,20 @@
+{
+  "name": "space-saboteurs-server",
+  "version": "1.0.0",
+  "description": "Authoritative Socket.IO game server for Space Saboteurs",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "space-saboteurs-client",
+  "version": "1.0.0",
+  "description": "Static browser client for Space Saboteurs (hand-gesture controlled online multiplayer)",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/generate-env.js",
+    "dev": "node scripts/generate-env.js && npx serve -l 3000 ."
+  }
+}

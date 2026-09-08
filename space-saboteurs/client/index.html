@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Space Saboteurs</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ============ MAIN MENU ============ -->
+<div id="screen-menu" class="screen active">
+  <div class="title">SPACE SABOTEURS</div>
+  <div class="menu-buttons">
+    <button class="primary" id="btn-create-game">CREATE GAME</button>
+    <button id="btn-join-game">JOIN GAME</button>
+    <button id="btn-quick-play">QUICK PLAY</button>
+    <button id="btn-how-to-play">HOW TO PLAY</button>
+  </div>
+  <div id="menu-error" class="menu-error"></div>
+</div>
+
+<!-- Join room modal -->
+<div id="modal-join" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <h2>Join Game</h2>
+    <input type="text" id="input-room-code" placeholder="ROOM CODE" maxlength="6" style="text-transform:uppercase;" />
+    <input type="text" id="input-join-name" placeholder="PLAYER NAME" maxlength="16" />
+    <div class="row">
+      <button id="btn-join-cancel">Cancel</button>
+      <button class="primary" id="btn-join-confirm">JOIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- Name modal (create / quick play) -->
+<div id="modal-name" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <h2 id="modal-name-title">Your Name</h2>
+    <input type="text" id="input-name" placeholder="PLAYER NAME" maxlength="16" />
+    <div class="row">
+      <button id="btn-name-cancel">Cancel</button>
+      <button class="primary" id="btn-name-confirm">CONTINUE</button>
+    </div>
+  </div>
+</div>
+
+<!-- How to play modal -->
+<div id="modal-help" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="width:420px;">
+    <h2>How to Play</h2>
+    <p style="font-size:13px;line-height:1.5;">
+      Move with your hand — hold your palm up to the camera and drift it around
+      a neutral zone to steer. Crewmates complete tasks and look for trouble.
+      One or more Imposters kill in secret and sabotage the station. Report
+      bodies or call meetings to vote someone out. Crewmates win by finishing
+      all tasks or ejecting every Imposter; Imposters win by evening the
+      numbers or letting a critical sabotage run out.
+    </p>
+    <button class="primary" id="btn-help-close">GOT IT</button>
+  </div>
+</div>
+
+<!-- ============ LOBBY ============ -->
+<div id="screen-lobby" class="screen">
+  <div class="title" style="font-size:28px;">SPACE SABOTEURS</div>
+  <div class="room-code" id="lobby-room-code">------</div>
+  <div class="player-list">
+    <div style="font-size:12px;color:#7c94ff;margin-bottom:8px;">PLAYERS <span id="lobby-player-count">0/10</span></div>
+    <div id="lobby-players"></div>
+  </div>
+  <div class="lobby-settings" id="lobby-settings">
+    <div class="setting"><span>Imposters</span><strong id="setting-imposters">1</strong></div>
+    <div class="setting"><span>Map</span><strong>Nebula Station</strong></div>
+    <div class="setting"><span>Kill Cooldown</span><strong id="setting-cooldown">20s</strong></div>
+    <div class="setting"><span>Task Count</span><strong id="setting-tasks">4</strong></div>
+  </div>
+  <div class="lobby-actions">
+    <button id="btn-ready">READY</button>
+    <button class="primary" id="btn-start-game" style="display:none;">START GAME</button>
+    <button class="danger" id="btn-leave-lobby">LEAVE</button>
+  </div>
+  <div id="lobby-status" style="font-size:13px;color:#7c94ff;">Waiting for host...</div>
+</div>
+
+<!-- ============ CALIBRATION ============ -->
+<div id="calibration-overlay">
+  <h2>HAND CONTROL SETUP</h2>
+  <p style="font-size:13px;color:#9aa5c7;">Place your open hand inside the camera area, then calibrate.</p>
+  <div class="calibration-box">
+    <video id="calibration-video" autoplay playsinline muted></video>
+    <div class="move-zone-hint"></div>
+  </div>
+  <div id="calibration-status" style="font-size:13px;">Waiting for camera...</div>
+  <div class="row" style="gap:12px;">
+    <button class="primary" id="btn-calibrate">CALIBRATE</button>
+    <button id="btn-use-keyboard">USE KEYBOARD INSTEAD</button>
+  </div>
+</div>
+
+<!-- ============ GAME SCREEN ============ -->
+<div id="screen-game" class="screen">
+  <canvas id="game-canvas"></canvas>
+  <canvas id="minimap-canvas" width="180" height="72"></canvas>
+  <div id="minimap-label">MINI MAP</div>
+
+  <div id="hud-top">
+    <div id="connection-status"><span class="dot online"></span><span id="connection-text">ONLINE</span></div>
+    <div id="role-badge">CREWMATE</div>
+    <div id="task-progress">Tasks: 0/0</div>
+  </div>
+
+  <div id="sabotage-banner"></div>
+  <div id="interact-prompt"></div>
+  <div id="event-log"></div>
+
+  <div id="camera-panel">
+    <video id="game-video" autoplay playsinline muted></video>
+    <div class="cam-header">
+      <span>HAND CONTROL: <strong id="hand-control-state">ON</strong></span>
+      <button id="hide-camera-btn">HIDE</button>
+    </div>
+    <div id="gesture-indicator">
+      <span id="gesture-move">MOVE — </span>
+      <span id="gesture-name">NONE</span>
+    </div>
+  </div>
+
+  <div id="action-bar">
+    <button id="btn-use">USE</button>
+    <button id="btn-report" style="display:none;">REPORT</button>
+    <button class="danger" id="btn-kill" style="display:none;">KILL</button>
+    <button class="danger" id="btn-sabotage" style="display:none;">SABOTAGE</button>
+    <button id="btn-meeting">MEETING</button>
+  </div>
+</div>
+
+<!-- Sabotage menu -->
+<div id="modal-sabotage" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <h2>Sabotage</h2>
+    <div class="row" style="flex-wrap:wrap;">
+      <button data-sab="oxygen">OXYGEN</button>
+      <button data-sab="reactor">REACTOR</button>
+      <button data-sab="electrical">ELECTRICAL</button>
+      <button data-sab="communications">COMMS</button>
+      <button data-sab="doors">DOORS</button>
+    </div>
+    <button id="btn-sabotage-cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ============ MEETING OVERLAY ============ -->
+<div id="meeting-overlay">
+  <h1>MEETING</h1>
+  <div id="meeting-reason"></div>
+  <div id="meeting-timer">45</div>
+  <div id="vote-grid"></div>
+  <div id="meeting-chat">
+    <div id="chat-log"></div>
+    <div id="chat-form">
+      <input type="text" id="chat-input" maxlength="200" placeholder="Say something..." />
+      <button id="btn-chat-send">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ RESULTS OVERLAY ============ -->
+<div id="results-overlay">
+  <div id="results-title">CREWMATES WIN</div>
+  <div id="results-reason" style="color:#9aa5c7;font-size:13px;"></div>
+  <div id="results-list"></div>
+  <div class="row" style="gap:12px;">
+    <button class="primary" id="btn-play-again">PLAY AGAIN</button>
+    <button id="btn-return-lobby">RETURN TO LOBBY</button>
+  </div>
+</div>
+
+<!-- ============ DEBUG PANEL (F3) ============ -->
+<div id="debug-panel">
+  <div>FPS: <span id="dbg-fps">-</span> | PING: <span id="dbg-ping">-</span>ms</div>
+  <div>SERVER: <span id="dbg-server">-</span> | ROOM: <span id="dbg-room">-</span> | TICK PHASE: <span id="dbg-phase">-</span></div>
+  <div>PLAYER ID: <span id="dbg-playerid">-</span> | ROLE: <span id="dbg-role">-</span></div>
+  <div>POS: <span id="dbg-pos">-</span> | ROOM: <span id="dbg-currentroom">-</span></div>
+  <div>HAND: <span id="dbg-hand">-</span> | CONF: <span id="dbg-conf">-</span> | GESTURE: <span id="dbg-gesture">-</span></div>
+  <div>MOVEMENT: <span id="dbg-movement">-</span></div>
+</div>
+
+<div id="connection-lost-banner" style="display:none;position:absolute;top:0;left:0;right:0;background:#c0392b;text-align:center;padding:8px;font-weight:700;z-index:100;">
+  CONNECTION LOST — attempting to reconnect...
+</div>
+
+<!-- Socket.IO client (served by the game server, or CDN fallback) -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<!-- MediaPipe Hands: runs entirely client-side, webcam frames never leave the browser -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script src="env.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
