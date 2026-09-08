@@ -372,8 +372,17 @@ function enterGameScreen() {
   if (!usingKeyboard) {
     // Move the live game camera video feed into the in-game camera panel.
     const gameVideo = el("game-video");
-    if (handTracker) {
-      handTracker.videoEl.srcObject && (gameVideo.srcObject = handTracker.videoEl.srcObject);
+    if (handTracker && handTracker.videoEl.srcObject) {
+      gameVideo.srcObject = handTracker.videoEl.srcObject;
+      // Assigning srcObject does not start playback on its own — the
+      // calibration video gets .play() called on it inside HandTracker,
+      // but this second <video> element sharing the same stream needs
+      // its own explicit play() call. muted + playsInline are required
+      // for autoplay to be allowed by the browser without a fresh user
+      // gesture, and to avoid iOS Safari taking the video fullscreen.
+      gameVideo.muted = true;
+      gameVideo.playsInline = true;
+      gameVideo.play().catch((err) => console.warn("game-video play failed:", err));
     }
     handTracker.onResults = (result) => {
       const out = gestureController.update(result);
