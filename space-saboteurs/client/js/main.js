@@ -96,6 +96,14 @@ let pendingRoomName = "";
 let pendingAction = null;
 let joinRoomCode = "";
 
+
+// ---------------------------------------------------------------------
+// IMPORTANT:
+// null means "no vote selected yet".
+// Once the player clicks a player or SKIP, the value is preserved
+// throughout the meeting.
+// ---------------------------------------------------------------------
+
 let latestVoteTarget = null;
 
 let fps = 0;
@@ -485,6 +493,9 @@ function onJoinedRoom(res) {
   stopCamera();
   resetCameraState();
 
+  // Reset vote selection when entering a room.
+  latestVoteTarget = null;
+
   // Stop any previous game music.
   audioManager.stopBackgroundMusic();
 
@@ -556,13 +567,24 @@ function wireSocketEvents() {
       // ---------------------------------------------------------------
 
       if (state.phase === "MEETING") {
-        showMeetingOverlay(true);
 
-        // Start the buzzer only when entering the meeting.
-        // It will loop until the meeting closes.
+        // -------------------------------------------------------------
+        // IMPORTANT:
+        // Only clear the previous vote when a NEW meeting starts.
+        //
+        // Do NOT clear it every time showMeetingOverlay(true) runs.
+        // game_state can arrive repeatedly during the meeting.
+        // -------------------------------------------------------------
+
         if (previousPhase !== "MEETING") {
+          latestVoteTarget = null;
+
+          // Start the buzzer only when entering the meeting.
+          // It will loop until the meeting closes.
           audioManager.startMeetingBuzzer();
         }
+
+        showMeetingOverlay(true);
 
         renderMeeting();
 
@@ -708,6 +730,10 @@ function wireSocketEvents() {
   socketClient.on(
     "meeting_started",
     () => {
+
+      // A meeting_started event represents a fresh meeting.
+      latestVoteTarget = null;
+
       showMeetingOverlay(true);
 
       // Start the looping meeting buzzer.
@@ -725,6 +751,8 @@ function wireSocketEvents() {
   socketClient.on(
     "vote_updated",
     () => {
+      // Do NOT reset latestVoteTarget here.
+      // The selected card must remain highlighted.
       renderMeeting();
     }
   );
@@ -1098,6 +1126,8 @@ if (el("btn-leave-lobby")) {
 
       stopCamera();
       resetCameraState();
+
+      latestVoteTarget = null;
 
       audioManager.stopBackgroundMusic();
       audioManager.stopMeetingBuzzer();
@@ -2184,6 +2214,9 @@ function resetGameStateForLobby() {
   stopCamera();
 
   resetCameraState();
+
+  // Reset meeting vote.
+  latestVoteTarget = null;
 
   // Stop game background music.
   audioManager.stopBackgroundMusic();
@@ -3409,7 +3442,16 @@ function showMeetingOverlay(show) {
     show
   );
 
-  if (show) {
+  // IMPORTANT:
+  // Do not reset the vote while the meeting is open.
+  //
+  // renderMeeting() can be called many times because:
+  // - game_state updates
+  // - vote_updated events
+  // - meeting timer refresh
+  //
+  // Reset only when the meeting closes.
+  if (!show) {
     latestVoteTarget =
       null;
   }
@@ -3451,6 +3493,16 @@ function renderMeeting() {
         document.createElement(
           "div"
         );
+
+      // ---------------------------------------------------------------
+      // SELECTED CLASS
+      // ---------------------------------------------------------------
+      //
+      // If this player's ID matches latestVoteTarget,
+      // add "selected".
+      //
+      // CSS will visually highlight the card.
+      // ---------------------------------------------------------------
 
       card.className =
         "vote-card" +
@@ -3556,13 +3608,24 @@ function renderMeeting() {
 // =====================================================================
 
 function castVote(targetId) {
-  if (latestVoteTarget) {
+
+  // ---------------------------------------------------------------
+  // IMPORTANT:
+  // Use an explicit null check.
+  //
+  // This prevents multiple votes while allowing "skip"
+  // to be treated as a valid selected target.
+  // ---------------------------------------------------------------
+
+  if (latestVoteTarget !== null) {
     return;
   }
 
+  // Store the selected player immediately.
   latestVoteTarget =
     targetId;
 
+  // Send vote to server.
   socketClient.request(
     "submit_vote",
     {
@@ -3570,6 +3633,9 @@ function castVote(targetId) {
     }
   );
 
+  // Immediately redraw so the selected card gets
+  // the "selected" CSS class without waiting for
+  // another server update.
   renderMeeting();
 }
 
@@ -3680,6 +3746,7 @@ setInterval(
       net.phase === "MEETING" &&
       net.meeting
     ) {
+      // renderMeeting() preserves latestVoteTarget.
       renderMeeting();
     }
   },
@@ -3699,6 +3766,9 @@ function showResults(results) {
 
   // Stop meeting buzzer.
   audioManager.stopMeetingBuzzer();
+
+  // Clear vote after meeting/game is over.
+  latestVoteTarget = null;
 
   calibrationStarted =
     false;
@@ -3823,6 +3893,8 @@ if (el("btn-play-again")) {
 
       resetCameraState();
 
+      latestVoteTarget = null;
+
       audioManager.stopBackgroundMusic();
       audioManager.stopMeetingBuzzer();
 
@@ -3849,6 +3921,8 @@ if (el("btn-return-lobby")) {
       stopCamera();
 
       resetCameraState();
+
+      latestVoteTarget = null;
 
       audioManager.stopBackgroundMusic();
       audioManager.stopMeetingBuzzer();
@@ -4144,6 +4218,10 @@ console.log(
 
 console.log(
   "Meeting buzzer integration ready."
+);
+
+console.log(
+  "Voting selection highlight integration ready."
 );
 
 console.log(
