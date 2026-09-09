@@ -8,6 +8,10 @@ import {
 
 const PLAYER_RADIUS = 16;
 
+// Slightly larger client interaction tolerance.
+// Server remains authoritative.
+const DEFAULT_INTERACTION_RANGE = 105;
+
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -34,6 +38,18 @@ export class Renderer {
 
     this.lastTime = performance.now();
 
+    // ==========================================================
+    // VISUAL EFFECT STATE
+    // ==========================================================
+
+    this.visualTime = 0;
+
+    this.stars = [];
+    this.spaceDust = [];
+
+    this.createStars();
+    this.createSpaceDust();
+
     this.resize();
 
     window.addEventListener("resize", () => {
@@ -48,7 +64,8 @@ export class Renderer {
   resize() {
     if (!this.canvas || !this.ctx) return;
 
-    const rect = this.canvas.getBoundingClientRect();
+    const rect =
+      this.canvas.getBoundingClientRect();
 
     const width =
       rect.width ||
@@ -61,13 +78,22 @@ export class Renderer {
       720;
 
     const dpr =
-      Math.min(window.devicePixelRatio || 1, 2);
+      Math.min(
+        window.devicePixelRatio || 1,
+        2
+      );
 
     this.canvas.width =
-      Math.max(1, Math.floor(width * dpr));
+      Math.max(
+        1,
+        Math.floor(width * dpr)
+      );
 
     this.canvas.height =
-      Math.max(1, Math.floor(height * dpr));
+      Math.max(
+        1,
+        Math.floor(height * dpr)
+      );
 
     this.canvas.style.width =
       `${width}px`;
@@ -89,6 +115,105 @@ export class Renderer {
   }
 
   // ============================================================
+  // STAR GENERATION
+  // ============================================================
+
+  createStars() {
+    this.stars = [];
+
+    /*
+     * More stars than the original version.
+     *
+     * The positions are deterministic so the background
+     * does not randomly jump every time the game redraws.
+     */
+    for (let i = 0; i < 360; i++) {
+      const x =
+        (
+          i * 173.731 +
+          47.13
+        ) %
+        WORLD.width;
+
+      const y =
+        (
+          i * 91.417 +
+          29.71
+        ) %
+        WORLD.height;
+
+      const size =
+        i % 17 === 0
+          ? 2.1
+          : i % 7 === 0
+          ? 1.45
+          : 0.55 +
+            ((i * 13) % 100) /
+              180;
+
+      this.stars.push({
+        x,
+        y,
+        size,
+
+        baseAlpha:
+          0.25 +
+          ((i * 29) % 65) /
+            100,
+
+        twinkleSpeed:
+          0.7 +
+          ((i * 17) % 100) /
+            80,
+
+        twinkleOffset:
+          ((i * 43) % 100) /
+          10,
+
+        depth:
+          0.25 +
+          ((i * 19) % 70) /
+            100,
+      });
+    }
+  }
+
+  // ============================================================
+  // SPACE DUST
+  // ============================================================
+
+  createSpaceDust() {
+    this.spaceDust = [];
+
+    for (let i = 0; i < 90; i++) {
+      this.spaceDust.push({
+        x:
+          (i * 137.31) %
+          WORLD.width,
+
+        y:
+          (i * 73.19) %
+          WORLD.height,
+
+        size:
+          0.4 +
+          ((i * 11) % 100) /
+            180,
+
+        alpha:
+          0.04 +
+          ((i * 7) % 30) /
+            100,
+
+        depth:
+          0.15 +
+          ((i * 23) % 80) /
+            100,
+      });
+    }
+  }
+
+  // ============================================================
   // CAMERA
   // ============================================================
 
@@ -102,12 +227,6 @@ export class Renderer {
 
     this.camera.targetX = x;
     this.camera.targetY = y;
-
-    /*
-     * Keep the camera inside the actual map.
-     * This prevents the player from disappearing when
-     * reaching the edges.
-     */
 
     const halfW =
       this.viewW / 2;
@@ -177,7 +296,10 @@ export class Renderer {
         ? player.renderY
         : player.y;
 
-    this.centerCameraOn(x, y);
+    this.centerCameraOn(
+      x,
+      y
+    );
   }
 
   // ============================================================
@@ -216,7 +338,11 @@ export class Renderer {
   // MAIN DRAW
   // ============================================================
 
-  draw(net, localTasks = [], showRoles = false) {
+  draw(
+    net,
+    localTasks = [],
+    showRoles = false
+  ) {
     const now =
       performance.now();
 
@@ -227,6 +353,8 @@ export class Renderer {
       ) / 1000;
 
     this.lastTime = now;
+
+    this.visualTime += dt;
 
     this.clear();
 
@@ -246,10 +374,6 @@ export class Renderer {
 
     ctx.save();
 
-    /*
-     * Convert world coordinates into
-     * screen coordinates.
-     */
     ctx.translate(
       this.viewW / 2,
       this.viewH / 2
@@ -260,11 +384,15 @@ export class Renderer {
       -this.camera.y
     );
 
-    // ----------------------------------------------------------
-    // DRAW ORDER
-    // ----------------------------------------------------------
+    // ==========================================================
+    // SPACE
+    // ==========================================================
 
     this.drawSpaceBackground();
+
+    // ==========================================================
+    // SHIP
+    // ==========================================================
 
     this.drawStationHull();
 
@@ -296,6 +424,14 @@ export class Renderer {
 
     ctx.restore();
 
+    // ==========================================================
+    // SCREEN SPACE LIGHTING
+    // ==========================================================
+
+    this.drawFlashlight(
+      net
+    );
+
     this.drawVignette();
 
     if (net.sabotage) {
@@ -313,21 +449,17 @@ export class Renderer {
     const ctx =
       this.ctx;
 
+    const dpr =
+      Math.min(
+        window.devicePixelRatio || 1,
+        2
+      );
+
     ctx.setTransform(
-      window.devicePixelRatio > 1
-        ? Math.min(
-            window.devicePixelRatio,
-            2
-          )
-        : 1,
+      dpr,
       0,
       0,
-      window.devicePixelRatio > 1
-        ? Math.min(
-            window.devicePixelRatio,
-            2
-          )
-        : 1,
+      dpr,
       0,
       0
     );
@@ -353,7 +485,12 @@ export class Renderer {
     );
 
     gradient.addColorStop(
-      0.5,
+      0.35,
+      "#050a14"
+    );
+
+    gradient.addColorStop(
+      0.65,
       "#070c15"
     );
 
@@ -381,11 +518,43 @@ export class Renderer {
     const ctx =
       this.ctx;
 
-    /*
-     * Large space background.
-     */
+    // ----------------------------------------------------------
+    // Deep space
+    // ----------------------------------------------------------
+
+    const background =
+      ctx.createRadialGradient(
+        WORLD.width * 0.48,
+        WORLD.height * 0.45,
+        80,
+
+        WORLD.width * 0.48,
+        WORLD.height * 0.45,
+        WORLD.width * 0.9
+      );
+
+    background.addColorStop(
+      0,
+      "#0b1628"
+    );
+
+    background.addColorStop(
+      0.38,
+      "#050b16"
+    );
+
+    background.addColorStop(
+      0.72,
+      "#02050c"
+    );
+
+    background.addColorStop(
+      1,
+      "#010208"
+    );
+
     ctx.fillStyle =
-      "#01030a";
+      background;
 
     ctx.fillRect(
       -500,
@@ -394,62 +563,34 @@ export class Renderer {
       WORLD.height + 1000
     );
 
-    /*
-     * Stars.
-     */
-    for (let i = 0; i < 180; i++) {
-      const x =
-        (i * 137.53) %
-        WORLD.width;
+    // ----------------------------------------------------------
+    // Nebula
+    // ----------------------------------------------------------
 
-      const y =
-        (i * 71.17) %
-        WORLD.height;
-
-      const radius =
-        0.5 +
-        ((i * 17) % 10) /
-          10;
-
-      ctx.globalAlpha =
-        0.25 +
-        ((i * 13) % 50) /
-          100;
-
-      ctx.fillStyle =
-        "#dbeafe";
-
-      ctx.beginPath();
-
-      ctx.arc(
-        x,
-        y,
-        radius,
-        0,
-        Math.PI * 2
-      );
-
-      ctx.fill();
-    }
-
-    ctx.globalAlpha = 1;
-
-    /*
-     * Nebula glow.
-     */
     const nebula =
       ctx.createRadialGradient(
-        1000,
-        400,
-        50,
-        1000,
-        400,
-        1000
+        1250,
+        300,
+        60,
+
+        1250,
+        300,
+        850
       );
 
     nebula.addColorStop(
       0,
-      "rgba(30,90,150,0.18)"
+      "rgba(35,105,175,0.16)"
+    );
+
+    nebula.addColorStop(
+      0.35,
+      "rgba(20,70,140,0.08)"
+    );
+
+    nebula.addColorStop(
+      0.7,
+      "rgba(15,45,100,0.035)"
     );
 
     nebula.addColorStop(
@@ -461,11 +602,234 @@ export class Renderer {
       nebula;
 
     ctx.fillRect(
+      -100,
+      -100,
+      WORLD.width + 200,
+      WORLD.height + 200
+    );
+
+    // ----------------------------------------------------------
+    // Second subtle nebula
+    // ----------------------------------------------------------
+
+    const nebula2 =
+      ctx.createRadialGradient(
+        300,
+        650,
+        20,
+
+        300,
+        650,
+        650
+      );
+
+    nebula2.addColorStop(
+      0,
+      "rgba(80,55,145,0.10)"
+    );
+
+    nebula2.addColorStop(
+      0.45,
+      "rgba(50,40,110,0.04)"
+    );
+
+    nebula2.addColorStop(
+      1,
+      "rgba(0,0,0,0)"
+    );
+
+    ctx.fillStyle =
+      nebula2;
+
+    ctx.fillRect(
       0,
       0,
       WORLD.width,
       WORLD.height
     );
+
+    // ----------------------------------------------------------
+    // Stars
+    // ----------------------------------------------------------
+
+    this.stars.forEach(
+      (star) => {
+        const driftX =
+          this.camera.x *
+          star.depth *
+          0.018;
+
+        const driftY =
+          this.camera.y *
+          star.depth *
+          0.012;
+
+        let x =
+          star.x -
+          driftX;
+
+        let y =
+          star.y -
+          driftY;
+
+        // Wrap stars around world edges.
+        x =
+          ((x % WORLD.width) +
+            WORLD.width) %
+          WORLD.width;
+
+        y =
+          ((y % WORLD.height) +
+            WORLD.height) %
+          WORLD.height;
+
+        const twinkle =
+          Math.sin(
+            this.visualTime *
+              star.twinkleSpeed +
+              star.twinkleOffset
+          );
+
+        const alpha =
+          Math.max(
+            0.08,
+            Math.min(
+              1,
+              star.baseAlpha +
+                twinkle * 0.18
+            )
+          );
+
+        // Star
+        ctx.globalAlpha =
+          alpha;
+
+        ctx.fillStyle =
+          "#e6f4ff";
+
+        ctx.beginPath();
+
+        ctx.arc(
+          x,
+          y,
+          star.size,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.fill();
+
+        // Larger stars get a soft glow.
+        if (
+          star.size >= 1.4
+        ) {
+          ctx.globalAlpha =
+            alpha * 0.16;
+
+          ctx.beginPath();
+
+          ctx.arc(
+            x,
+            y,
+            star.size * 4,
+            0,
+            Math.PI * 2
+          );
+
+          ctx.fill();
+        }
+
+        // Occasional star sparkle.
+        if (
+          star.size >= 1.8 &&
+          twinkle > 0.65
+        ) {
+          ctx.globalAlpha =
+            alpha * 0.55;
+
+          ctx.strokeStyle =
+            "#dff7ff";
+
+          ctx.lineWidth = 0.7;
+
+          ctx.beginPath();
+
+          ctx.moveTo(
+            x - star.size * 3,
+            y
+          );
+
+          ctx.lineTo(
+            x + star.size * 3,
+            y
+          );
+
+          ctx.moveTo(
+            x,
+            y - star.size * 3
+          );
+
+          ctx.lineTo(
+            x,
+            y + star.size * 3
+          );
+
+          ctx.stroke();
+        }
+      }
+    );
+
+    ctx.globalAlpha = 1;
+
+    // ----------------------------------------------------------
+    // Space dust
+    // ----------------------------------------------------------
+
+    this.spaceDust.forEach(
+      (particle) => {
+        let x =
+          particle.x -
+          this.camera.x *
+            particle.depth *
+            0.035;
+
+        let y =
+          particle.y -
+          this.camera.y *
+            particle.depth *
+            0.025;
+
+        x =
+          ((x % WORLD.width) +
+            WORLD.width) %
+          WORLD.width;
+
+        y =
+          ((y % WORLD.height) +
+            WORLD.height) %
+          WORLD.height;
+
+        ctx.globalAlpha =
+          particle.alpha;
+
+        ctx.fillStyle =
+          "#9fb8d0";
+
+        ctx.beginPath();
+
+        ctx.arc(
+          x,
+          y,
+          particle.size,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.fill();
+      }
+    );
+
+    ctx.globalAlpha = 1;
   }
 
   // ============================================================
@@ -476,10 +840,13 @@ export class Renderer {
     const ctx =
       this.ctx;
 
-    /*
-     * Outer playable area.
-     */
     ctx.save();
+
+    // Outer shadow
+    ctx.shadowColor =
+      "rgba(0,0,0,0.75)";
+
+    ctx.shadowBlur = 30;
 
     ctx.fillStyle =
       "#0b111c";
@@ -503,9 +870,9 @@ export class Renderer {
 
     ctx.stroke();
 
-    /*
-     * Inner hull.
-     */
+    ctx.shadowBlur = 0;
+
+    // Inner hull line
     ctx.strokeStyle =
       "rgba(100,150,200,0.25)";
 
@@ -523,6 +890,62 @@ export class Renderer {
 
     ctx.stroke();
 
+    // Small outer lights
+    const lights = [
+      [90, 55],
+      [250, 55],
+      [410, 55],
+      [570, 55],
+      [730, 55],
+      [890, 55],
+      [1050, 55],
+      [1210, 55],
+      [1370, 55],
+      [1530, 55],
+      [1690, 55],
+      [1850, 55],
+
+      [90, WORLD.height - 55],
+      [250, WORLD.height - 55],
+      [410, WORLD.height - 55],
+      [570, WORLD.height - 55],
+      [730, WORLD.height - 55],
+      [890, WORLD.height - 55],
+      [1050, WORLD.height - 55],
+      [1210, WORLD.height - 55],
+      [1370, WORLD.height - 55],
+      [1530, WORLD.height - 55],
+      [1690, WORLD.height - 55],
+      [1850, WORLD.height - 55],
+    ];
+
+    lights.forEach(
+      ([x, y], index) => {
+        const pulse =
+          0.55 +
+          Math.sin(
+            this.visualTime * 2 +
+              index
+          ) *
+            0.18;
+
+        ctx.fillStyle =
+          `rgba(100,190,255,${pulse})`;
+
+        ctx.beginPath();
+
+        ctx.arc(
+          x,
+          y,
+          2,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.fill();
+      }
+    );
+
     ctx.restore();
   }
 
@@ -538,9 +961,12 @@ export class Renderer {
       (c) => {
         ctx.save();
 
-        /*
-         * Corridor floor.
-         */
+        // Corridor shadow
+        ctx.shadowColor =
+          "rgba(0,0,0,0.5)";
+
+        ctx.shadowBlur = 10;
+
         ctx.fillStyle =
           "#202938";
 
@@ -551,22 +977,26 @@ export class Renderer {
           c.h
         );
 
-        /*
-         * Corridor inner floor.
-         */
+        ctx.shadowBlur = 0;
+
+        // Inner floor
         ctx.fillStyle =
           "#171f2d";
 
         ctx.fillRect(
           c.x + 5,
           c.y + 5,
-          Math.max(0, c.w - 10),
-          Math.max(0, c.h - 10)
+          Math.max(
+            0,
+            c.w - 10
+          ),
+          Math.max(
+            0,
+            c.h - 10
+          )
         );
 
-        /*
-         * Edge lighting.
-         */
+        // Border
         ctx.strokeStyle =
           "#44536e";
 
@@ -579,9 +1009,7 @@ export class Renderer {
           c.h
         );
 
-        /*
-         * Floor panels.
-         */
+        // Floor panels
         ctx.strokeStyle =
           "rgba(120,150,180,0.15)";
 
@@ -592,8 +1020,10 @@ export class Renderer {
 
         if (horizontal) {
           for (
-            let x = c.x + 25;
-            x < c.x + c.w;
+            let x =
+              c.x + 25;
+            x <
+              c.x + c.w;
             x += 50
           ) {
             ctx.beginPath();
@@ -612,8 +1042,10 @@ export class Renderer {
           }
         } else {
           for (
-            let y = c.y + 25;
-            y < c.y + c.h;
+            let y =
+              c.y + 25;
+            y <
+              c.y + c.h;
             y += 50
           ) {
             ctx.beginPath();
@@ -630,6 +1062,98 @@ export class Renderer {
 
             ctx.stroke();
           }
+        }
+
+        // Corridor ceiling lights
+        const lightCount =
+          horizontal
+            ? Math.max(
+                1,
+                Math.floor(
+                  c.w / 140
+                )
+              )
+            : Math.max(
+                1,
+                Math.floor(
+                  c.h / 140
+                )
+              );
+
+        for (
+          let i = 0;
+          i < lightCount;
+          i++
+        ) {
+          let lx;
+          let ly;
+
+          if (horizontal) {
+            lx =
+              c.x +
+              ((i + 1) /
+                (lightCount + 1)) *
+                c.w;
+
+            ly =
+              c.y +
+              c.h / 2;
+          } else {
+            lx =
+              c.x +
+              c.w / 2;
+
+            ly =
+              c.y +
+              ((i + 1) /
+                (lightCount + 1)) *
+                c.h;
+          }
+
+          const glow =
+            ctx.createRadialGradient(
+              lx,
+              ly,
+              0,
+              lx,
+              ly,
+              35
+            );
+
+          glow.addColorStop(
+            0,
+            "rgba(120,210,255,0.15)"
+          );
+
+          glow.addColorStop(
+            1,
+            "rgba(120,210,255,0)"
+          );
+
+          ctx.fillStyle =
+            glow;
+
+          ctx.beginPath();
+
+          ctx.arc(
+            lx,
+            ly,
+            35,
+            0,
+            Math.PI * 2
+          );
+
+          ctx.fill();
+
+          ctx.fillStyle =
+            "rgba(190,230,255,0.55)";
+
+          ctx.fillRect(
+            lx - 7,
+            ly - 1,
+            14,
+            2
+          );
         }
 
         ctx.restore();
@@ -667,9 +1191,12 @@ export class Renderer {
           roomStyles[name] ||
           "#263142";
 
-        /*
-         * Room floor.
-         */
+        // Room shadow
+        ctx.shadowColor =
+          "rgba(0,0,0,0.45)";
+
+        ctx.shadowBlur = 14;
+
         ctx.fillStyle =
           baseColor;
 
@@ -680,9 +1207,9 @@ export class Renderer {
           r.h
         );
 
-        /*
-         * Inner floor.
-         */
+        ctx.shadowBlur = 0;
+
+        // Inner darkness
         ctx.fillStyle =
           "rgba(10,16,25,0.22)";
 
@@ -699,9 +1226,7 @@ export class Renderer {
           )
         );
 
-        /*
-         * Room border.
-         */
+        // Main room border
         ctx.strokeStyle =
           "#5a6985";
 
@@ -714,9 +1239,7 @@ export class Renderer {
           r.h
         );
 
-        /*
-         * Inner border.
-         */
+        // Inner border
         ctx.strokeStyle =
           "rgba(150,180,210,0.18)";
 
@@ -735,9 +1258,7 @@ export class Renderer {
           )
         );
 
-        /*
-         * Room header.
-         */
+        // Header
         ctx.fillStyle =
           "rgba(5,9,16,0.48)";
 
@@ -748,9 +1269,7 @@ export class Renderer {
           34
         );
 
-        /*
-         * Room name.
-         */
+        // Room name
         ctx.fillStyle =
           "#dbe7f5";
 
@@ -764,14 +1283,103 @@ export class Renderer {
           "middle";
 
         ctx.fillText(
-          String(r.label || name).toUpperCase(),
+          String(
+            r.label || name
+          ).toUpperCase(),
           r.x + 12,
           r.y + 17
+        );
+
+        // Ceiling lights
+        this.drawRoomLighting(
+          r
         );
 
         ctx.restore();
       }
     );
+  }
+
+  // ============================================================
+  // ROOM LIGHTING
+  // ============================================================
+
+  drawRoomLighting(room) {
+    const ctx =
+      this.ctx;
+
+    const count =
+      Math.max(
+        1,
+        Math.floor(
+          room.w / 140
+        )
+      );
+
+    for (
+      let i = 0;
+      i < count;
+      i++
+    ) {
+      const x =
+        room.x +
+        ((i + 1) /
+          (count + 1)) *
+          room.w;
+
+      const y =
+        room.y + 11;
+
+      const glow =
+        ctx.createRadialGradient(
+          x,
+          y,
+          0,
+          x,
+          y,
+          58
+        );
+
+      glow.addColorStop(
+        0,
+        "rgba(130,215,255,0.14)"
+      );
+
+      glow.addColorStop(
+        0.45,
+        "rgba(100,180,240,0.055)"
+      );
+
+      glow.addColorStop(
+        1,
+        "rgba(0,0,0,0)"
+      );
+
+      ctx.fillStyle =
+        glow;
+
+      ctx.beginPath();
+
+      ctx.arc(
+        x,
+        y,
+        58,
+        0,
+        Math.PI * 2
+      );
+
+      ctx.fill();
+
+      ctx.fillStyle =
+        "rgba(195,230,255,0.6)";
+
+      ctx.fillRect(
+        x - 10,
+        y - 2,
+        20,
+        4
+      );
+    }
   }
 
   // ============================================================
@@ -782,9 +1390,6 @@ export class Renderer {
     const ctx =
       this.ctx;
 
-    /*
-     * Cafeteria tables.
-     */
     const cafeteria =
       ROOMS.cafeteria;
 
@@ -828,14 +1433,51 @@ export class Renderer {
       );
     }
 
-    /*
-     * Reactor core.
-     */
+    // ==========================================================
+    // REACTOR
+    // ==========================================================
+
     const reactor =
       ROOMS.reactor;
 
     if (reactor) {
       ctx.save();
+
+      // Reactor glow
+      const reactorGlow =
+        ctx.createRadialGradient(
+          210,
+          200,
+          10,
+          210,
+          200,
+          100
+        );
+
+      reactorGlow.addColorStop(
+        0,
+        "rgba(168,85,247,0.20)"
+      );
+
+      reactorGlow.addColorStop(
+        1,
+        "rgba(168,85,247,0)"
+      );
+
+      ctx.fillStyle =
+        reactorGlow;
+
+      ctx.beginPath();
+
+      ctx.arc(
+        210,
+        200,
+        100,
+        0,
+        Math.PI * 2
+      );
+
+      ctx.fill();
 
       ctx.fillStyle =
         "#111827";
@@ -881,6 +1523,27 @@ export class Renderer {
 
       ctx.fill();
 
+      // Rotating reactor detail
+      const angle =
+        this.visualTime * 0.5;
+
+      ctx.strokeStyle =
+        "rgba(220,180,255,0.65)";
+
+      ctx.lineWidth = 2;
+
+      ctx.beginPath();
+
+      ctx.arc(
+        210,
+        200,
+        42,
+        angle,
+        angle + 1.2
+      );
+
+      ctx.stroke();
+
       ctx.restore();
 
       this.drawConsole(
@@ -890,9 +1553,10 @@ export class Renderer {
       );
     }
 
-    /*
-     * Electrical panels.
-     */
+    // ==========================================================
+    // ELECTRICAL
+    // ==========================================================
+
     this.drawConsole(
       110,
       480,
@@ -905,9 +1569,6 @@ export class Renderer {
       "#e0a93a"
     );
 
-    /*
-     * Electrical generator.
-     */
     ctx.save();
 
     ctx.fillStyle =
@@ -958,10 +1619,46 @@ export class Renderer {
 
     ctx.restore();
 
-    /*
-     * Medbay scanner.
-     */
+    // ==========================================================
+    // MEDBAY SCANNER
+    // ==========================================================
+
     ctx.save();
+
+    const scannerGlow =
+      ctx.createRadialGradient(
+        582,
+        557,
+        2,
+        582,
+        557,
+        70
+      );
+
+    scannerGlow.addColorStop(
+      0,
+      "rgba(45,220,210,0.15)"
+    );
+
+    scannerGlow.addColorStop(
+      1,
+      "rgba(45,220,210,0)"
+    );
+
+    ctx.fillStyle =
+      scannerGlow;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      582,
+      557,
+      70,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
 
     ctx.fillStyle =
       "#b9c5d6";
@@ -997,9 +1694,10 @@ export class Renderer {
 
     ctx.restore();
 
-    /*
-     * Security monitors.
-     */
+    // ==========================================================
+    // SECURITY
+    // ==========================================================
+
     this.drawMonitor(
       875,
       510
@@ -1015,18 +1713,20 @@ export class Renderer {
       510
     );
 
-    /*
-     * Navigation console.
-     */
+    // ==========================================================
+    // NAVIGATION
+    // ==========================================================
+
     this.drawConsole(
       1730,
       180,
       "#4fc3f7"
     );
 
-    /*
-     * Communications array.
-     */
+    // ==========================================================
+    // COMMUNICATIONS
+    // ==========================================================
+
     ctx.save();
 
     ctx.strokeStyle =
@@ -1075,11 +1775,34 @@ export class Renderer {
 
     ctx.stroke();
 
+    // Signal pulse
+    const signal =
+      Math.sin(
+        this.visualTime * 3
+      );
+
+    ctx.strokeStyle =
+      `rgba(56,189,248,${0.35 + signal * 0.12})`;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      1760,
+      575,
+      55 +
+        signal * 5,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.stroke();
+
     ctx.restore();
 
-    /*
-     * Storage crates.
-     */
+    // ==========================================================
+    // STORAGE CRATES
+    // ==========================================================
+
     const crates = [
       [1210, 520],
       [1280, 520],
@@ -1098,9 +1821,10 @@ export class Renderer {
       }
     );
 
-    /*
-     * Admin desk.
-     */
+    // ==========================================================
+    // ADMIN TERMINAL
+    // ==========================================================
+
     ctx.save();
 
     ctx.fillStyle =
@@ -1142,11 +1866,21 @@ export class Renderer {
   // TABLE
   // ============================================================
 
-  drawTable(x, y, w, h) {
+  drawTable(
+    x,
+    y,
+    w,
+    h
+  ) {
     const ctx =
       this.ctx;
 
     ctx.save();
+
+    ctx.shadowColor =
+      "rgba(0,0,0,0.45)";
+
+    ctx.shadowBlur = 8;
 
     ctx.fillStyle =
       "#34495e";
@@ -1170,6 +1904,8 @@ export class Renderer {
 
     ctx.stroke();
 
+    ctx.shadowBlur = 0;
+
     ctx.fillStyle =
       "#1e293b";
 
@@ -1185,6 +1921,13 @@ export class Renderer {
 
     ctx.fill();
 
+    ctx.strokeStyle =
+      "rgba(150,180,210,0.3)";
+
+    ctx.lineWidth = 2;
+
+    ctx.stroke();
+
     ctx.restore();
   }
 
@@ -1192,11 +1935,51 @@ export class Renderer {
   // CONSOLE
   // ============================================================
 
-  drawConsole(x, y, glow) {
+  drawConsole(
+    x,
+    y,
+    glow
+  ) {
     const ctx =
       this.ctx;
 
     ctx.save();
+
+    // Console glow
+    const light =
+      ctx.createRadialGradient(
+        x + 27,
+        y + 24,
+        2,
+        x + 27,
+        y + 24,
+        55
+      );
+
+    light.addColorStop(
+      0,
+      "rgba(80,190,255,0.12)"
+    );
+
+    light.addColorStop(
+      1,
+      "rgba(80,190,255,0)"
+    );
+
+    ctx.fillStyle =
+      light;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      x + 27,
+      y + 24,
+      55,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
 
     ctx.fillStyle =
       "#1b2430";
@@ -1247,7 +2030,10 @@ export class Renderer {
   // MONITOR
   // ============================================================
 
-  drawMonitor(x, y) {
+  drawMonitor(
+    x,
+    y
+  ) {
     const ctx =
       this.ctx;
 
@@ -1285,6 +2071,32 @@ export class Renderer {
       22
     );
 
+    // Screen scan line
+    ctx.strokeStyle =
+      "rgba(125,211,252,0.35)";
+
+    ctx.lineWidth = 1;
+
+    const scanY =
+      y +
+      7 +
+      ((this.visualTime * 20) %
+        18);
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      x + 7,
+      scanY
+    );
+
+    ctx.lineTo(
+      x + 38,
+      scanY
+    );
+
+    ctx.stroke();
+
     ctx.fillStyle =
       "#6b7280";
 
@@ -1302,11 +2114,19 @@ export class Renderer {
   // CRATE
   // ============================================================
 
-  drawCrate(x, y) {
+  drawCrate(
+    x,
+    y
+  ) {
     const ctx =
       this.ctx;
 
     ctx.save();
+
+    ctx.shadowColor =
+      "rgba(0,0,0,0.4)";
+
+    ctx.shadowBlur = 7;
 
     ctx.fillStyle =
       "#4b5563";
@@ -1329,6 +2149,8 @@ export class Renderer {
       45,
       45
     );
+
+    ctx.shadowBlur = 0;
 
     ctx.strokeStyle =
       "#6b7280";
@@ -1364,14 +2186,11 @@ export class Renderer {
   // DOORS
   // ============================================================
 
-  drawDoors(sabotage) {
+  drawDoors(
+    sabotage
+  ) {
     const ctx =
       this.ctx;
-
-    /*
-     * Door positions are based on
-     * the connections between rooms.
-     */
 
     const doors = [
       {
@@ -1461,7 +2280,16 @@ export class Renderer {
 
         const blocked =
           sabotage &&
-          sabotage.type === "doors";
+          sabotage.type ===
+            "doors";
+
+        ctx.shadowColor =
+          blocked
+            ? "rgba(255,30,30,0.55)"
+            : "rgba(120,180,255,0.2)";
+
+        ctx.shadowBlur =
+          blocked ? 12 : 4;
 
         ctx.fillStyle =
           blocked
@@ -1489,6 +2317,32 @@ export class Renderer {
           door.h
         );
 
+        ctx.shadowBlur = 0;
+
+        // Door center indicator
+        ctx.fillStyle =
+          blocked
+            ? "#fee2e2"
+            : "#dbeafe";
+
+        if (
+          door.vertical
+        ) {
+          ctx.fillRect(
+            door.x + door.w / 2 - 2,
+            door.y + 8,
+            4,
+            door.h - 16
+          );
+        } else {
+          ctx.fillRect(
+            door.x + 8,
+            door.y + door.h / 2 - 2,
+            door.w - 16,
+            4
+          );
+        }
+
         ctx.restore();
       }
     );
@@ -1499,12 +2353,6 @@ export class Renderer {
   // ============================================================
 
   drawObstacles() {
-    /*
-     * The current client MapData does not export
-     * obstacle data, so we draw the known map
-     * obstacles directly here.
-     */
-
     const obstacles = [
       {
         x: 790,
@@ -1589,21 +2437,14 @@ export class Renderer {
 
     obstacles.forEach(
       (o) => {
-        /*
-         * Main decorative objects have already
-         * been drawn in drawRoomDetails().
-         *
-         * This function adds subtle shadows so
-         * they don't appear flat.
-         */
-
         const ctx =
           this.ctx;
 
         ctx.save();
 
+        // Shadow underneath object
         ctx.fillStyle =
-          "rgba(0,0,0,0.18)";
+          "rgba(0,0,0,0.20)";
 
         ctx.fillRect(
           o.x + 5,
@@ -1621,9 +2462,13 @@ export class Renderer {
   // TASKS
   // ============================================================
 
-  drawTasks(localTasks = []) {
+  drawTasks(
+    localTasks = []
+  ) {
     if (
-      !Array.isArray(localTasks) ||
+      !Array.isArray(
+        localTasks
+      ) ||
       localTasks.length === 0
     ) {
       return;
@@ -1635,21 +2480,25 @@ export class Renderer {
     const assignedIds =
       new Set(
         localTasks.map(
-          (task) => task.id
+          (task) =>
+            task.id
         )
       );
 
     TASKS
       .filter(
         (task) =>
-          assignedIds.has(task.id)
+          assignedIds.has(
+            task.id
+          )
       )
       .forEach(
         (task) => {
           const localTask =
             localTasks.find(
               (t) =>
-                t.id === task.id
+                t.id ===
+                task.id
             );
 
           const done =
@@ -1660,34 +2509,52 @@ export class Renderer {
 
           ctx.save();
 
-          /*
-           * Glow.
-           */
           if (!done) {
+            const pulse =
+              1 +
+              Math.sin(
+                this.visualTime * 4
+              ) *
+                0.12;
+
+            // Task outer glow
             ctx.shadowColor =
               "#facc15";
 
-            ctx.shadowBlur = 14;
+            ctx.shadowBlur = 18;
+
+            ctx.beginPath();
+
+            ctx.arc(
+              task.x,
+              task.y,
+              10 * pulse,
+              0,
+              Math.PI * 2
+            );
+
+            ctx.fillStyle =
+              "#facc15";
+
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+          } else {
+            ctx.beginPath();
+
+            ctx.arc(
+              task.x,
+              task.y,
+              10,
+              0,
+              Math.PI * 2
+            );
+
+            ctx.fillStyle =
+              "#22c55e";
+
+            ctx.fill();
           }
-
-          ctx.beginPath();
-
-          ctx.arc(
-            task.x,
-            task.y,
-            10,
-            0,
-            Math.PI * 2
-          );
-
-          ctx.fillStyle =
-            done
-              ? "#22c55e"
-              : "#facc15";
-
-          ctx.fill();
-
-          ctx.shadowBlur = 0;
 
           ctx.strokeStyle =
             "#020617";
@@ -1696,9 +2563,6 @@ export class Renderer {
 
           ctx.stroke();
 
-          /*
-           * Task symbol.
-           */
           ctx.fillStyle =
             "#111827";
 
@@ -1712,14 +2576,13 @@ export class Renderer {
             "middle";
 
           ctx.fillText(
-            done ? "✓" : "!",
+            done
+              ? "✓"
+              : "!",
             task.x,
             task.y
           );
 
-          /*
-           * Label.
-           */
           if (!done) {
             ctx.fillStyle =
               "#f8fafc";
@@ -1749,9 +2612,13 @@ export class Renderer {
   // BODIES
   // ============================================================
 
-  drawBodies(bodies = []) {
+  drawBodies(
+    bodies = []
+  ) {
     if (
-      !Array.isArray(bodies)
+      !Array.isArray(
+        bodies
+      )
     ) {
       return;
     }
@@ -1780,9 +2647,12 @@ export class Renderer {
           y
         );
 
-        /*
-         * Body shadow.
-         */
+        // Body glow
+        ctx.shadowColor =
+          "rgba(255,40,40,0.45)";
+
+        ctx.shadowBlur = 12;
+
         ctx.fillStyle =
           "rgba(0,0,0,0.35)";
 
@@ -1800,9 +2670,8 @@ export class Renderer {
 
         ctx.fill();
 
-        /*
-         * Body.
-         */
+        ctx.shadowBlur = 0;
+
         ctx.fillStyle =
           "#b91c1c";
 
@@ -1827,9 +2696,6 @@ export class Renderer {
 
         ctx.stroke();
 
-        /*
-         * Bone.
-         */
         ctx.strokeStyle =
           "#f8fafc";
 
@@ -1859,9 +2725,6 @@ export class Renderer {
 
         ctx.stroke();
 
-        /*
-         * Body label.
-         */
         ctx.fillStyle =
           "#f8fafc";
 
@@ -1894,14 +2757,6 @@ export class Renderer {
 
     let players = [];
 
-    /*
-     * IMPORTANT:
-     * NetworkState.players is a Map.
-     *
-     * This handles both Map and Array so
-     * the renderer never crashes.
-     */
-
     if (
       net.players instanceof Map
     ) {
@@ -1910,13 +2765,16 @@ export class Renderer {
           net.players.values()
         );
     } else if (
-      Array.isArray(net.players)
+      Array.isArray(
+        net.players
+      )
     ) {
       players =
         net.players;
     } else if (
       net.players &&
-      typeof net.players === "object"
+      typeof net.players ===
+        "object"
     ) {
       players =
         Object.values(
@@ -1930,13 +2788,15 @@ export class Renderer {
       if (!player) continue;
 
       if (
-        player.connected === false
+        player.connected ===
+        false
       ) {
         continue;
       }
 
       if (
-        player.alive === false
+        player.alive ===
+        false
       ) {
         this.drawGhost(
           player
@@ -1956,17 +2816,24 @@ export class Renderer {
   // PLAYER
   // ============================================================
 
-  drawPlayer(player, net) {
+  drawPlayer(
+    player,
+    net
+  ) {
     const ctx =
       this.ctx;
 
     const x =
-      Number.isFinite(player.renderX)
+      Number.isFinite(
+        player.renderX
+      )
         ? player.renderX
         : player.x;
 
     const y =
-      Number.isFinite(player.renderY)
+      Number.isFinite(
+        player.renderY
+      )
         ? player.renderY
         : player.y;
 
@@ -1978,7 +2845,8 @@ export class Renderer {
     }
 
     const isLocal =
-      player.id === net.playerId;
+      player.id ===
+      net.playerId;
 
     ctx.save();
 
@@ -1987,11 +2855,9 @@ export class Renderer {
       y
     );
 
-    /*
-     * Shadow.
-     */
+    // Player shadow
     ctx.fillStyle =
-      "rgba(0,0,0,0.35)";
+      "rgba(0,0,0,0.40)";
 
     ctx.beginPath();
 
@@ -2007,19 +2873,15 @@ export class Renderer {
 
     ctx.fill();
 
-    /*
-     * Local-player glow.
-     */
+    // Local player glow
     if (isLocal) {
       ctx.shadowColor =
-        "#ffffff";
+        "rgba(130,220,255,0.85)";
 
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 18;
     }
 
-    /*
-     * Character body.
-     */
+    // Body
     ctx.fillStyle =
       player.color ||
       "#38bdf8";
@@ -2038,9 +2900,6 @@ export class Renderer {
 
     ctx.shadowBlur = 0;
 
-    /*
-     * Body outline.
-     */
     ctx.strokeStyle =
       "#0b1220";
 
@@ -2048,9 +2907,7 @@ export class Renderer {
 
     ctx.stroke();
 
-    /*
-     * Backpack.
-     */
+    // Backpack
     ctx.fillStyle =
       player.color ||
       "#38bdf8";
@@ -2062,9 +2919,7 @@ export class Renderer {
       17
     );
 
-    /*
-     * Visor.
-     */
+    // Visor
     const visor =
       ctx.createLinearGradient(
         -7,
@@ -2075,7 +2930,7 @@ export class Renderer {
 
     visor.addColorStop(
       0,
-      "#dff8ff"
+      "#e9fbff"
     );
 
     visor.addColorStop(
@@ -2110,11 +2965,9 @@ export class Renderer {
 
     ctx.stroke();
 
-    /*
-     * Small helmet highlight.
-     */
+    // Visor reflection
     ctx.fillStyle =
-      "rgba(255,255,255,0.55)";
+      "rgba(255,255,255,0.58)";
 
     ctx.beginPath();
 
@@ -2130,9 +2983,31 @@ export class Renderer {
 
     ctx.fill();
 
-    /*
-     * Player name.
-     */
+    // Feet
+    ctx.fillStyle =
+      "#18232d";
+
+    ctx.beginPath();
+
+    ctx.roundRect(
+      -11,
+      13,
+      8,
+      7,
+      3
+    );
+
+    ctx.roundRect(
+      3,
+      13,
+      8,
+      7,
+      3
+    );
+
+    ctx.fill();
+
+    // Name
     ctx.fillStyle =
       "#ffffff";
 
@@ -2152,12 +3027,17 @@ export class Renderer {
       -25
     );
 
-    /*
-     * Local player marker.
-     */
+    // Local player selection ring
     if (isLocal) {
+      const pulse =
+        1 +
+        Math.sin(
+          this.visualTime * 3
+        ) *
+          0.06;
+
       ctx.strokeStyle =
-        "rgba(255,255,255,0.9)";
+        "rgba(255,255,255,0.85)";
 
       ctx.lineWidth = 2;
 
@@ -2166,7 +3046,7 @@ export class Renderer {
       ctx.arc(
         0,
         0,
-        23,
+        23 * pulse,
         0,
         Math.PI * 2
       );
@@ -2181,17 +3061,23 @@ export class Renderer {
   // GHOST
   // ============================================================
 
-  drawGhost(player) {
+  drawGhost(
+    player
+  ) {
     const ctx =
       this.ctx;
 
     const x =
-      Number.isFinite(player.renderX)
+      Number.isFinite(
+        player.renderX
+      )
         ? player.renderX
         : player.x;
 
     const y =
-      Number.isFinite(player.renderY)
+      Number.isFinite(
+        player.renderY
+      )
         ? player.renderY
         : player.y;
 
@@ -2212,6 +3098,11 @@ export class Renderer {
     ctx.globalAlpha =
       0.42;
 
+    ctx.shadowColor =
+      "rgba(180,230,255,0.5)";
+
+    ctx.shadowBlur = 12;
+
     ctx.fillStyle =
       player.color ||
       "#94a3b8";
@@ -2227,6 +3118,8 @@ export class Renderer {
     );
 
     ctx.fill();
+
+    ctx.shadowBlur = 0;
 
     ctx.globalAlpha = 1;
 
@@ -2256,9 +3149,6 @@ export class Renderer {
     const ctx =
       this.ctx;
 
-    /*
-     * Floor lights.
-     */
     const lights = [
       [500, 220],
       [650, 220],
@@ -2275,9 +3165,17 @@ export class Renderer {
     ctx.save();
 
     lights.forEach(
-      ([x, y]) => {
+      ([x, y], index) => {
+        const pulse =
+          0.45 +
+          Math.sin(
+            this.visualTime * 2 +
+              index * 0.8
+          ) *
+            0.12;
+
         ctx.fillStyle =
-          "rgba(100,190,255,0.55)";
+          `rgba(100,190,255,${pulse})`;
 
         ctx.fillRect(
           x,
@@ -2288,9 +3186,7 @@ export class Renderer {
       }
     );
 
-    /*
-     * Small navigation markings.
-     */
+    // Hull floor strips
     ctx.strokeStyle =
       "rgba(100,150,190,0.25)";
 
@@ -2298,7 +3194,8 @@ export class Renderer {
 
     for (
       let x = 60;
-      x < WORLD.width - 60;
+      x <
+      WORLD.width - 60;
       x += 100
     ) {
       ctx.beginPath();
@@ -2320,6 +3217,231 @@ export class Renderer {
   }
 
   // ============================================================
+  // FLASHLIGHT / TORCH VISION
+  // ============================================================
+
+  drawFlashlight(net) {
+    const me =
+      net?.me;
+
+    if (!me) {
+      return;
+    }
+
+    if (
+      me.alive === false
+    ) {
+      return;
+    }
+
+    const x =
+      Number.isFinite(
+        me.renderX
+      )
+        ? me.renderX
+        : me.x;
+
+    const y =
+      Number.isFinite(
+        me.renderY
+      )
+        ? me.renderY
+        : me.y;
+
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y)
+    ) {
+      return;
+    }
+
+    const player =
+      this.worldToScreen(
+        x,
+        y
+      );
+
+    const ctx =
+      this.ctx;
+
+    /*
+     * This is intentionally done as a normal dark overlay
+     * rather than destination-out. This prevents the browser
+     * page behind the canvas from becoming visible.
+     */
+
+    const darkness =
+      ctx.createRadialGradient(
+        player.x,
+        player.y,
+        45,
+
+        player.x,
+        player.y,
+        285
+      );
+
+    // Center remains clear.
+    darkness.addColorStop(
+      0,
+      "rgba(0,0,0,0)"
+    );
+
+    darkness.addColorStop(
+      0.28,
+      "rgba(0,0,0,0.04)"
+    );
+
+    darkness.addColorStop(
+      0.52,
+      "rgba(0,0,0,0.20)"
+    );
+
+    darkness.addColorStop(
+      0.72,
+      "rgba(0,0,0,0.48)"
+    );
+
+    darkness.addColorStop(
+      0.88,
+      "rgba(0,0,0,0.68)"
+    );
+
+    darkness.addColorStop(
+      1,
+      "rgba(0,0,0,0.82)"
+    );
+
+    ctx.save();
+
+    ctx.fillStyle =
+      darkness;
+
+    ctx.fillRect(
+      0,
+      0,
+      this.viewW,
+      this.viewH
+    );
+
+    ctx.restore();
+
+    /*
+     * Soft torch light.
+     */
+
+    const torch =
+      ctx.createRadialGradient(
+        player.x,
+        player.y,
+        5,
+
+        player.x,
+        player.y,
+        210
+      );
+
+    torch.addColorStop(
+      0,
+      "rgba(255,255,255,0.13)"
+    );
+
+    torch.addColorStop(
+      0.20,
+      "rgba(220,245,255,0.09)"
+    );
+
+    torch.addColorStop(
+      0.45,
+      "rgba(130,205,255,0.045)"
+    );
+
+    torch.addColorStop(
+      0.72,
+      "rgba(80,150,220,0.018)"
+    );
+
+    torch.addColorStop(
+      1,
+      "rgba(0,0,0,0)"
+    );
+
+    ctx.save();
+
+    ctx.globalCompositeOperation =
+      "screen";
+
+    ctx.fillStyle =
+      torch;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      player.x,
+      player.y,
+      210,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.restore();
+
+    /*
+     * Small bright center around the player.
+     */
+
+    const centerLight =
+      ctx.createRadialGradient(
+        player.x,
+        player.y,
+        0,
+
+        player.x,
+        player.y,
+        75
+      );
+
+    centerLight.addColorStop(
+      0,
+      "rgba(255,255,255,0.10)"
+    );
+
+    centerLight.addColorStop(
+      0.55,
+      "rgba(180,225,255,0.035)"
+    );
+
+    centerLight.addColorStop(
+      1,
+      "rgba(0,0,0,0)"
+    );
+
+    ctx.save();
+
+    ctx.globalCompositeOperation =
+      "screen";
+
+    ctx.fillStyle =
+      centerLight;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      player.x,
+      player.y,
+      75,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // ============================================================
   // VIGNETTE
   // ============================================================
 
@@ -2331,6 +3453,7 @@ export class Renderer {
       ctx.createRadialGradient(
         this.viewW / 2,
         this.viewH / 2,
+
         Math.min(
           this.viewW,
           this.viewH
@@ -2338,6 +3461,7 @@ export class Renderer {
 
         this.viewW / 2,
         this.viewH / 2,
+
         Math.max(
           this.viewW,
           this.viewH
@@ -2347,6 +3471,16 @@ export class Renderer {
     gradient.addColorStop(
       0,
       "rgba(0,0,0,0)"
+    );
+
+    gradient.addColorStop(
+      0.65,
+      "rgba(0,0,0,0.06)"
+    );
+
+    gradient.addColorStop(
+      0.85,
+      "rgba(0,0,0,0.20)"
     );
 
     gradient.addColorStop(
@@ -2379,45 +3513,75 @@ export class Renderer {
     const ctx =
       this.ctx;
 
+    // ----------------------------------------------------------
+    // Electrical sabotage
+    // ----------------------------------------------------------
+
     if (
-      sabotage.type !==
+      sabotage.type ===
       "electrical"
     ) {
-      return;
+      ctx.save();
+
+      const pulse =
+        0.04 +
+        Math.sin(
+          this.visualTime * 5
+        ) *
+          0.025;
+
+      ctx.fillStyle =
+        `rgba(20,0,0,${Math.max(
+          0.015,
+          pulse
+        )})`;
+
+      ctx.fillRect(
+        0,
+        0,
+        this.viewW,
+        this.viewH
+      );
+
+      ctx.strokeStyle =
+        "rgba(239,68,68,0.35)";
+
+      ctx.lineWidth = 3;
+
+      ctx.strokeRect(
+        2,
+        2,
+        this.viewW - 4,
+        this.viewH - 4
+      );
+
+      ctx.restore();
     }
 
-    ctx.save();
+    // ----------------------------------------------------------
+    // Doors sabotage
+    // ----------------------------------------------------------
 
-    /*
-     * Don't completely cover the map.
-     * The map must remain visible.
-     */
-    ctx.fillStyle =
-      "rgba(20,0,0,0.12)";
+    if (
+      sabotage.type ===
+      "doors"
+    ) {
+      ctx.save();
 
-    ctx.fillRect(
-      0,
-      0,
-      this.viewW,
-      this.viewH
-    );
+      ctx.strokeStyle =
+        "rgba(239,68,68,0.16)";
 
-    /*
-     * Red warning border.
-     */
-    ctx.strokeStyle =
-      "rgba(239,68,68,0.55)";
+      ctx.lineWidth = 2;
 
-    ctx.lineWidth = 4;
+      ctx.strokeRect(
+        5,
+        5,
+        this.viewW - 10,
+        this.viewH - 10
+      );
 
-    ctx.strokeRect(
-      2,
-      2,
-      this.viewW - 4,
-      this.viewH - 4
-    );
-
-    ctx.restore();
+      ctx.restore();
+    }
   }
 
   // ============================================================
@@ -2434,36 +3598,55 @@ export class Renderer {
     let nearest =
       null;
 
-    let nearestDistance =
+    const interactionRange =
       Number.isFinite(range)
-        ? range
-        : 70;
+        ? Math.max(
+            range,
+            DEFAULT_INTERACTION_RANGE
+          )
+        : DEFAULT_INTERACTION_RANGE;
+
+    let nearestDistance =
+      interactionRange;
 
     const tasks =
-      Array.isArray(localTasks)
+      Array.isArray(
+        localTasks
+      )
         ? localTasks
         : [];
 
     const assignedIds =
       new Set(
         tasks.map(
-          (task) => task.id
+          (task) =>
+            task.id
         )
       );
+
+    // ----------------------------------------------------------
+    // TASK INTERACTION
+    // ----------------------------------------------------------
 
     TASKS
       .filter(
         (task) =>
-          assignedIds.has(task.id)
+          assignedIds.has(
+            task.id
+          )
       )
       .forEach(
         (task) => {
           const localTask =
             tasks.find(
               (t) =>
-                t.id === task.id
+                t.id ===
+                task.id
             );
 
+          /*
+           * Never show completed tasks.
+           */
           if (
             localTask &&
             localTask.completed
@@ -2471,14 +3654,34 @@ export class Renderer {
             return;
           }
 
+          if (
+            !Number.isFinite(
+              task.x
+            ) ||
+            !Number.isFinite(
+              task.y
+            )
+          ) {
+            return;
+          }
+
           const distance =
             Math.hypot(
-              task.x - worldX,
-              task.y - worldY
+              task.x -
+                worldX,
+
+              task.y -
+                worldY
             );
 
+          /*
+           * Task markers represent the interaction
+           * area around the actual equipment.
+           *
+           * The server performs the final validation.
+           */
           if (
-            distance <
+            distance <=
             nearestDistance
           ) {
             nearestDistance =
@@ -2487,26 +3690,47 @@ export class Renderer {
             nearest = {
               type: "task",
               task,
+              distance,
             };
           }
         }
       );
 
+    // ----------------------------------------------------------
+    // BODY REPORT INTERACTION
+    // ----------------------------------------------------------
+
     if (
-      Array.isArray(bodies)
+      Array.isArray(
+        bodies
+      )
     ) {
       bodies.forEach(
         (body) => {
           if (!body) return;
 
+          if (
+            !Number.isFinite(
+              body.x
+            ) ||
+            !Number.isFinite(
+              body.y
+            )
+          ) {
+            return;
+          }
+
           const distance =
             Math.hypot(
-              body.x - worldX,
-              body.y - worldY
+              body.x -
+                worldX,
+
+              body.y -
+                worldY
             );
 
           if (
-            distance <
+            distance <=
             nearestDistance
           ) {
             nearestDistance =
@@ -2515,6 +3739,7 @@ export class Renderer {
             nearest = {
               type: "body",
               body,
+              distance,
             };
           }
         }
