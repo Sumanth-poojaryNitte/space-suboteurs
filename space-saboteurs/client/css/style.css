@@ -14,6 +14,10 @@ body {
   overflow: hidden;
 }
 
+/* =========================================================
+   GLOBAL BUTTONS
+   ========================================================= */
+
 button {
   font-family: inherit;
   cursor: pointer;
@@ -24,16 +28,24 @@ button {
   font-weight: 600;
   background: #2b3554;
   color: #e8ecf7;
-  transition: background 0.15s;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 button:hover {
   background: #3a4670;
 }
 
+button:active {
+  transform: scale(0.97);
+}
+
 button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  transform: none;
 }
 
 button.primary {
@@ -60,7 +72,17 @@ input[type="text"] {
   border-radius: 8px;
   font-size: 14px;
   width: 100%;
+  outline: none;
 }
+
+input[type="text"]:focus {
+  border-color: #4f6df0;
+  box-shadow: 0 0 0 2px rgba(79, 109, 240, 0.18);
+}
+
+/* =========================================================
+   SCREENS
+   ========================================================= */
 
 .screen {
   position: absolute;
@@ -72,18 +94,21 @@ input[type="text"] {
   display: flex;
 }
 
-/* ---------- Menu ---------- */
+/* =========================================================
+   MENU
+   ========================================================= */
 
 #screen-menu {
   align-items: center;
   justify-content: center;
   flex-direction: column;
   gap: 24px;
-  background: radial-gradient(
-    circle at 50% 20%,
-    #1b2340 0%,
-    #05070d 70%
-  );
+  background:
+    radial-gradient(
+      circle at 50% 20%,
+      #1b2340 0%,
+      #05070d 70%
+    );
 }
 
 .title {
@@ -107,7 +132,9 @@ input[type="text"] {
   font-size: 13px;
 }
 
-/* ---------- Modal ---------- */
+/* =========================================================
+   MODAL
+   ========================================================= */
 
 .modal-backdrop {
   position: absolute;
@@ -128,6 +155,9 @@ input[type="text"] {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow:
+    0 15px 50px rgba(0, 0, 0, 0.45),
+    0 0 30px rgba(79, 109, 240, 0.08);
 }
 
 .modal h2 {
@@ -140,13 +170,16 @@ input[type="text"] {
   gap: 8px;
 }
 
-/* ---------- Lobby ---------- */
+/* =========================================================
+   LOBBY
+   ========================================================= */
 
 #screen-lobby {
   flex-direction: column;
   align-items: center;
   padding: 40px 20px;
   gap: 16px;
+  overflow-y: auto;
 }
 
 .room-code {
@@ -157,6 +190,7 @@ input[type="text"] {
   background: #12172a;
   padding: 10px 24px;
   border-radius: 10px;
+  box-shadow: 0 0 25px rgba(241, 196, 15, 0.08);
 }
 
 .player-list {
@@ -180,6 +214,7 @@ input[type="text"] {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .lobby-settings {
@@ -204,11 +239,15 @@ input[type="text"] {
   gap: 12px;
 }
 
-/* ---------- Game screen ---------- */
+/* =========================================================
+   GAME SCREEN
+   ========================================================= */
 
 #screen-game {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  background: #05070d;
 }
 
 #game-canvas {
@@ -219,6 +258,10 @@ input[type="text"] {
   display: block;
 }
 
+/* =========================================================
+   MINIMAP
+   ========================================================= */
+
 #minimap-canvas {
   position: absolute;
   top: 14px;
@@ -226,6 +269,9 @@ input[type="text"] {
   border: 2px solid #2b3554;
   border-radius: 8px;
   background: rgba(10, 13, 22, 0.8);
+  box-shadow:
+    0 0 15px rgba(0, 0, 0, 0.35),
+    0 0 20px rgba(79, 109, 240, 0.08);
 }
 
 #minimap-label {
@@ -235,7 +281,12 @@ input[type="text"] {
   font-size: 10px;
   letter-spacing: 2px;
   color: #7c94ff;
+  pointer-events: none;
 }
+
+/* =========================================================
+   TOP HUD
+   ========================================================= */
 
 #hud-top {
   position: absolute;
@@ -245,6 +296,7 @@ input[type="text"] {
   flex-direction: column;
   gap: 6px;
   font-size: 12px;
+  z-index: 10;
 }
 
 #connection-status {
@@ -254,6 +306,7 @@ input[type="text"] {
   background: rgba(10, 13, 22, 0.8);
   padding: 6px 10px;
   border-radius: 6px;
+  backdrop-filter: blur(4px);
 }
 
 #connection-status .dot {
@@ -263,14 +316,17 @@ input[type="text"] {
 
 .dot.online {
   background: #2ecc71;
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.7);
 }
 
 .dot.connecting {
   background: #f1c40f;
+  box-shadow: 0 0 8px rgba(241, 196, 15, 0.7);
 }
 
 .dot.offline {
   background: #e74c3c;
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.7);
 }
 
 #role-badge {
@@ -278,6 +334,7 @@ input[type="text"] {
   padding: 6px 10px;
   border-radius: 6px;
   font-weight: 700;
+  backdrop-filter: blur(4px);
 }
 
 #role-badge.imposter {
@@ -292,7 +349,12 @@ input[type="text"] {
   background: rgba(10, 13, 22, 0.8);
   padding: 6px 10px;
   border-radius: 6px;
+  backdrop-filter: blur(4px);
 }
+
+/* =========================================================
+   EVENT LOG
+   ========================================================= */
 
 #event-log {
   position: absolute;
@@ -308,7 +370,24 @@ input[type="text"] {
   display: flex;
   flex-direction: column-reverse;
   gap: 3px;
+  z-index: 10;
+  backdrop-filter: blur(4px);
 }
+
+#event-log::-webkit-scrollbar,
+#chat-log::-webkit-scrollbar {
+  width: 5px;
+}
+
+#event-log::-webkit-scrollbar-thumb,
+#chat-log::-webkit-scrollbar-thumb {
+  background: #2b3554;
+  border-radius: 10px;
+}
+
+/* =========================================================
+   ACTION BAR
+   ========================================================= */
 
 #action-bar {
   position: absolute;
@@ -316,11 +395,16 @@ input[type="text"] {
   right: 14px;
   display: flex;
   gap: 10px;
+  z-index: 10;
 }
 
 #action-bar button {
   min-width: 84px;
 }
+
+/* =========================================================
+   INTERACTION PROMPT
+   ========================================================= */
 
 #interact-prompt {
   position: absolute;
@@ -332,7 +416,14 @@ input[type="text"] {
   border-radius: 8px;
   font-size: 13px;
   display: none;
+  z-index: 15;
+  border: 1px solid rgba(124, 148, 255, 0.25);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
 }
+
+/* =========================================================
+   SABOTAGE BANNER
+   ========================================================= */
 
 #sabotage-banner {
   position: absolute;
@@ -345,9 +436,15 @@ input[type="text"] {
   font-weight: 700;
   display: none;
   text-align: center;
+  z-index: 20;
+  box-shadow:
+    0 0 20px rgba(192, 57, 43, 0.4),
+    0 0 40px rgba(192, 57, 43, 0.15);
 }
 
-/* ---------- Camera panel ---------- */
+/* =========================================================
+   CAMERA PANEL
+   ========================================================= */
 
 #camera-panel {
   position: absolute;
@@ -358,6 +455,10 @@ input[type="text"] {
   border: 2px solid #2b3554;
   border-radius: 8px;
   overflow: hidden;
+  z-index: 12;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.35),
+    0 0 20px rgba(79, 109, 240, 0.05);
 }
 
 #camera-panel video {
@@ -366,6 +467,7 @@ input[type="text"] {
   object-fit: cover;
   transform: scaleX(-1);
   display: block;
+  background: #000;
 }
 
 #camera-panel.hidden video {
@@ -392,18 +494,26 @@ input[type="text"] {
   font-size: 11px;
 }
 
-/* ---------- Meeting overlay ---------- */
+/* =========================================================
+   MEETING OVERLAY
+   ========================================================= */
 
 #meeting-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(5, 7, 13, 0.95);
+  background:
+    radial-gradient(
+      circle at 50% 10%,
+      rgba(27, 35, 64, 0.35),
+      rgba(5, 7, 13, 0.97) 65%
+    );
   display: none;
   flex-direction: column;
   align-items: center;
   padding: 30px;
   gap: 14px;
   z-index: 45;
+  overflow-y: auto;
 }
 
 #meeting-overlay.active {
@@ -413,12 +523,20 @@ input[type="text"] {
 #meeting-reason {
   font-size: 16px;
   color: #f1c40f;
+  font-weight: 700;
+  text-align: center;
 }
 
 #meeting-timer {
   font-size: 28px;
   font-weight: 800;
+  color: #e8ecf7;
+  min-height: 34px;
 }
+
+/* =========================================================
+   VOTE GRID
+   ========================================================= */
 
 #vote-grid {
   display: grid;
@@ -431,7 +549,9 @@ input[type="text"] {
   max-width: 700px;
 }
 
-/* ---------- Vote cards ---------- */
+/* =========================================================
+   VOTE CARDS
+   ========================================================= */
 
 .vote-card {
   position: relative;
@@ -439,31 +559,42 @@ input[type="text"] {
   border: 1px solid #2b3554;
   border-radius: 8px;
   padding: 10px;
+  min-height: 70px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   cursor: pointer;
+
   transition:
     border-color 0.15s ease,
     background 0.15s ease,
     box-shadow 0.15s ease,
     transform 0.15s ease;
+
+  user-select: none;
 }
 
 .vote-card:hover {
   border-color: #4f6df0;
+  background: #171e36;
   transform: translateY(-2px);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.25);
 }
 
-/* Selected player after voting */
+/* =========================================================
+   SELECTED PLAYER AFTER VOTING
+   ========================================================= */
 
 .vote-card.selected {
   border: 3px solid #00ff88;
   background: rgba(0, 255, 136, 0.18);
   box-shadow:
     0 0 10px rgba(0, 255, 136, 0.7),
-    0 0 25px rgba(0, 255, 136, 0.35);
+    0 0 25px rgba(0, 255, 136, 0.35),
+    inset 0 0 15px rgba(0, 255, 136, 0.08);
+
   transform: scale(1.03);
   z-index: 2;
 }
@@ -482,7 +613,12 @@ input[type="text"] {
   font-weight: bold;
   color: #00ff88;
   letter-spacing: 1px;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
 }
+
+/* =========================================================
+   DEAD VOTE CARD
+   ========================================================= */
 
 .vote-card.dead {
   opacity: 0.35;
@@ -491,10 +627,14 @@ input[type="text"] {
 
 .vote-card.dead:hover {
   border-color: #2b3554;
+  background: #12172a;
   transform: none;
+  box-shadow: none;
 }
 
-/* ---------- Meeting chat ---------- */
+/* =========================================================
+   MEETING CHAT
+   ========================================================= */
 
 #meeting-chat {
   width: 100%;
@@ -506,6 +646,7 @@ input[type="text"] {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
 }
 
 #chat-log {
@@ -526,17 +667,25 @@ input[type="text"] {
   flex: 1;
 }
 
-/* ---------- Results overlay ---------- */
+/* =========================================================
+   RESULTS OVERLAY
+   ========================================================= */
 
 #results-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(5, 7, 13, 0.97);
+  background:
+    radial-gradient(
+      circle at 50% 40%,
+      rgba(27, 35, 64, 0.25),
+      rgba(5, 7, 13, 0.98) 70%
+    );
   display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 18px;
+  z-index: 55;
 }
 
 #results-overlay.active {
@@ -546,14 +695,18 @@ input[type="text"] {
 #results-title {
   font-size: 36px;
   font-weight: 800;
+  text-align: center;
+  text-shadow: 0 0 25px rgba(255, 255, 255, 0.08);
 }
 
 #results-title.crew-win {
   color: #3498db;
+  text-shadow: 0 0 20px rgba(52, 152, 219, 0.4);
 }
 
 #results-title.imposter-win {
   color: #e74c3c;
+  text-shadow: 0 0 20px rgba(231, 76, 60, 0.4);
 }
 
 #results-list {
@@ -562,6 +715,7 @@ input[type="text"] {
   border: 1px solid #2b3554;
   border-radius: 10px;
   padding: 14px;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
 }
 
 .result-row {
@@ -571,7 +725,9 @@ input[type="text"] {
   padding: 4px 0;
 }
 
-/* ---------- Debug panel ---------- */
+/* =========================================================
+   DEBUG PANEL
+   ========================================================= */
 
 #debug-panel {
   position: absolute;
@@ -593,12 +749,19 @@ input[type="text"] {
   display: flex;
 }
 
-/* ---------- Calibration ---------- */
+/* =========================================================
+   CALIBRATION
+   ========================================================= */
 
 #calibration-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(5, 7, 13, 0.95);
+  background:
+    radial-gradient(
+      circle at 50% 40%,
+      rgba(27, 35, 64, 0.4),
+      rgba(5, 7, 13, 0.97) 70%
+    );
   display: none;
   flex-direction: column;
   align-items: center;
@@ -618,6 +781,9 @@ input[type="text"] {
   border: 2px solid #4f6df0;
   transform: scaleX(-1);
   background: #000;
+  box-shadow:
+    0 0 20px rgba(79, 109, 240, 0.25),
+    0 0 50px rgba(79, 109, 240, 0.08);
 }
 
 .calibration-box {
@@ -630,4 +796,93 @@ input[type="text"] {
   border: 2px dashed rgba(124, 148, 255, 0.6);
   border-radius: 8px;
   pointer-events: none;
+}
+
+/* =========================================================
+   RESPONSIVE MEETING UI
+   ========================================================= */
+
+@media (max-width: 700px) {
+  #vote-grid {
+    grid-template-columns: repeat(
+      2,
+      minmax(120px, 1fr)
+    );
+  }
+
+  #meeting-overlay {
+    padding: 20px 12px;
+  }
+
+  #meeting-chat {
+    max-width: 100%;
+  }
+
+  #camera-panel {
+    left: 14px;
+    bottom: 80px;
+    width: 170px;
+  }
+
+  #camera-panel video {
+    height: 110px;
+  }
+
+  #event-log {
+    width: 240px;
+  }
+}
+
+@media (max-width: 500px) {
+  .title {
+    font-size: 32px;
+    letter-spacing: 2px;
+  }
+
+  .menu-buttons {
+    width: 220px;
+  }
+
+  .player-list {
+    width: 90%;
+    max-width: 340px;
+  }
+
+  .lobby-settings {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #vote-grid {
+    grid-template-columns: repeat(
+      2,
+      minmax(100px, 1fr)
+    );
+  }
+
+  .vote-card {
+    min-height: 65px;
+    padding: 8px;
+  }
+
+  #action-bar {
+    right: 10px;
+    bottom: 10px;
+    gap: 6px;
+  }
+
+  #action-bar button {
+    min-width: 70px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  #camera-panel {
+    width: 150px;
+  }
+
+  #event-log {
+    width: 200px;
+    max-height: 110px;
+  }
 }
