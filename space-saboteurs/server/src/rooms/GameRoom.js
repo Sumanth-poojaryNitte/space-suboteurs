@@ -38,12 +38,23 @@ const TICK_MS = 1000 / TICK_RATE;
 const MEETING_DURATION_MS = 45000;
 const COUNTDOWN_MS = 5000;
 
+/*
+ * Task interaction is intentionally a little larger than the
+ * movement collision radius. Several task coordinates are placed
+ * on consoles/panels, so the player should interact from beside
+ * the object rather than having to stand inside the object.
+ */
+const EFFECTIVE_TASK_RANGE = Math.max(TASK_RANGE, 105);
+
 function genPlayerId() {
   return "player_" + Math.random().toString(36).slice(2, 10);
 }
 
 function genReconnectToken() {
-  return Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+  return (
+    Math.random().toString(36).slice(2, 12) +
+    Date.now().toString(36)
+  );
 }
 
 class GameRoom {
@@ -92,7 +103,9 @@ class GameRoom {
   }
 
   isEmpty() {
-    return [...this.players.values()].every((p) => !p.connected);
+    return [...this.players.values()].every(
+      (p) => !p.connected
+    );
   }
 
   // ---------- player management ----------
@@ -115,7 +128,9 @@ class GameRoom {
     }
 
     const taken = new Set(
-      [...this.players.values()].map((p) => p.name.toLowerCase())
+      [...this.players.values()].map((p) =>
+        p.name.toLowerCase()
+      )
     );
 
     let finalName = nameTrimmed;
@@ -129,7 +144,9 @@ class GameRoom {
     const id = genPlayerId();
 
     const spawn =
-      SPAWN_POINTS[this.players.size % SPAWN_POINTS.length];
+      SPAWN_POINTS[
+        this.players.size % SPAWN_POINTS.length
+      ];
 
     const safeSpawn = clampToWalkable(
       spawn.x,
@@ -300,9 +317,9 @@ class GameRoom {
       return { error: "GAME_ALREADY_STARTED" };
     }
 
-    const connectedCount = [...this.players.values()].filter(
-      (p) => p.connected
-    ).length;
+    const connectedCount = [
+      ...this.players.values(),
+    ].filter((p) => p.connected).length;
 
     if (connectedCount < MIN_PLAYERS_TO_START) {
       return { error: "NOT_ENOUGH_PLAYERS" };
@@ -325,7 +342,8 @@ class GameRoom {
     }
 
     this.phase = "COUNTDOWN";
-    this.countdownEndsAt = Date.now() + COUNTDOWN_MS;
+    this.countdownEndsAt =
+      Date.now() + COUNTDOWN_MS;
 
     return {
       ok: true,
@@ -340,9 +358,9 @@ class GameRoom {
     this.meeting = null;
     this.winner = null;
 
-    const connected = [...this.players.values()].filter(
-      (p) => p.connected
-    );
+    const connected = [
+      ...this.players.values(),
+    ].filter((p) => p.connected);
 
     const shuffled = [...connected].sort(
       () => Math.random() - 0.5
@@ -362,10 +380,13 @@ class GameRoom {
       p.alive = true;
 
       p.killCooldownUntil =
-        Date.now() + this.settings.killCooldownMs;
+        Date.now() +
+        this.settings.killCooldownMs;
 
       const spawn =
-        SPAWN_POINTS[i % SPAWN_POINTS.length];
+        SPAWN_POINTS[
+          i % SPAWN_POINTS.length
+        ];
 
       const safeSpawn = clampToWalkable(
         spawn.x,
@@ -408,7 +429,6 @@ class GameRoom {
     if (!player.alive) return;
 
     player.input = clampMovementVector(x, y);
-
     player.lastInputAt = Date.now();
   }
 
@@ -423,9 +443,19 @@ class GameRoom {
 
     const player = this.players.get(playerId);
 
-    if (!player || !player.alive) {
+    if (
+      !player ||
+      !player.connected ||
+      !player.alive
+    ) {
       return {
         error: "INVALID_PLAYER",
+      };
+    }
+
+    if (!taskId || typeof taskId !== "string") {
+      return {
+        error: "INVALID_TASK",
       };
     }
 
@@ -455,21 +485,79 @@ class GameRoom {
       };
     }
 
-    if (distance(player, def) > TASK_RANGE) {
+    /*
+     * The task definition contains x/y coordinates.
+     * The player only needs to reach the interaction
+     * radius around the object. This is important because
+     * many task coordinates are deliberately placed on
+     * consoles, scanners, panels, or other non-walkable
+     * objects.
+     */
+    const taskDistance = distance(
+      player,
+      def
+    );
+
+    if (
+      !Number.isFinite(taskDistance) ||
+      taskDistance > EFFECTIVE_TASK_RANGE
+    ) {
       return {
         error: "TOO_FAR",
+        distance: Math.round(taskDistance),
+        requiredRange: EFFECTIVE_TASK_RANGE,
       };
     }
 
+    /*
+     * Complete the task server-side.
+     */
     task.completed = true;
+
+    const progress = this.taskProgress();
+
+    /*
+     * Immediately push the updated private task list.
+     * This prevents the client from continuing to show
+     * an already-completed task after the server accepted it.
+     */
+    if (player.socketId) {
+      this.io
+        .to(player.socketId)
+        .emit(
+          "private_state",
+          this.privateSnapshot(player.id)
+        );
+    }
+
+    /*
+     * Also notify everyone so the task progress bar/HUD
+     * can update immediately.
+     */
+    this.io
+      .to(this.roomId)
+      .emit("task_updated", {
+        playerId: player.id,
+        taskId: task.id,
+        progress,
+      });
 
     return {
       ok: true,
+      taskId: task.id,
+      progress,
+      task: {
+        id: task.id,
+        completed: true,
+        label: def.label,
+      },
     };
   }
 
   taskProgress() {
-    const crew = [...this.players.values()].filter(
+    const crew = [
+      ...this.players.values(),
+    ].filter(
       (p) => p.role === "CREWMATE"
     );
 
@@ -532,13 +620,19 @@ class GameRoom {
       };
     }
 
-    if (Date.now() < killer.killCooldownUntil) {
+    if (
+      Date.now() <
+      killer.killCooldownUntil
+    ) {
       return {
         error: "ON_COOLDOWN",
       };
     }
 
-    if (distance(killer, target) > KILL_RANGE) {
+    if (
+      distance(killer, target) >
+      KILL_RANGE
+    ) {
       return {
         error: "TOO_FAR",
       };
@@ -547,7 +641,8 @@ class GameRoom {
     target.alive = false;
 
     killer.killCooldownUntil =
-      Date.now() + this.settings.killCooldownMs;
+      Date.now() +
+      this.settings.killCooldownMs;
 
     const body = {
       id:
@@ -1379,7 +1474,7 @@ class GameRoom {
         REPORT_RANGE,
 
       taskRange:
-        TASK_RANGE,
+        EFFECTIVE_TASK_RANGE,
     };
   }
 
