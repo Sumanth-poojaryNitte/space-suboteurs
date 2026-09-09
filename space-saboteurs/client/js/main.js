@@ -34,6 +34,8 @@ import { AudioManager } from "./audio/AudioManager.js";
 // AUDIO:
 // Background music starts when the actual game screen starts.
 // Kill sound plays when a player_killed event is received.
+// Meeting buzzer starts when a meeting starts.
+// Meeting buzzer loops until the meeting closes.
 // =====================================================================
 
 
@@ -54,6 +56,7 @@ const renderer = new Renderer(canvas);
 const minimap = new Minimap(
   document.getElementById("minimap-canvas")
 );
+
 
 // ---------------------------------------------------------------------
 // AUDIO
@@ -485,6 +488,9 @@ function onJoinedRoom(res) {
   // Stop any previous game music.
   audioManager.stopBackgroundMusic();
 
+  // Stop any previous meeting buzzer.
+  audioManager.stopMeetingBuzzer();
+
   showModal(
     "modal-name",
     false
@@ -551,8 +557,22 @@ function wireSocketEvents() {
 
       if (state.phase === "MEETING") {
         showMeetingOverlay(true);
+
+        // Start the buzzer only when entering the meeting.
+        // It will loop until the meeting closes.
+        if (previousPhase !== "MEETING") {
+          audioManager.startMeetingBuzzer();
+        }
+
         renderMeeting();
+
       } else {
+
+        // Meeting has closed.
+        if (previousPhase === "MEETING") {
+          audioManager.stopMeetingBuzzer();
+        }
+
         showMeetingOverlay(false);
       }
 
@@ -689,6 +709,10 @@ function wireSocketEvents() {
     "meeting_started",
     () => {
       showMeetingOverlay(true);
+
+      // Start the looping meeting buzzer.
+      audioManager.startMeetingBuzzer();
+
       renderMeeting();
     }
   );
@@ -803,6 +827,9 @@ function wireSocketEvents() {
       "disconnect",
       () => {
         setConnectionUi("offline");
+
+        // Stop meeting buzzer if connection is lost.
+        audioManager.stopMeetingBuzzer();
 
         if (el("connection-lost-banner")) {
           el(
@@ -1073,6 +1100,7 @@ if (el("btn-leave-lobby")) {
       resetCameraState();
 
       audioManager.stopBackgroundMusic();
+      audioManager.stopMeetingBuzzer();
 
       showScreen(
         "screen-menu"
@@ -1481,13 +1509,6 @@ function cameraErrorMessage(err) {
 // =====================================================================
 // PERMANENT HANDTRACKER RESULT CALLBACK
 // =====================================================================
-//
-// THIS IS THE IMPORTANT FIX.
-//
-// HandTracker is constructed with this callback.
-// We never replace handTracker.onResults later.
-//
-// =====================================================================
 
 function handleHandTrackerResult(result) {
   if (!result) {
@@ -1618,8 +1639,6 @@ function createHandTracker(video) {
   return new HandTracker({
     videoEl: video,
 
-    // IMPORTANT:
-    // One stable callback for the entire lifetime.
     onResults: handleHandTrackerResult,
 
     onError: (error) => {
@@ -1649,10 +1668,6 @@ function createHandTracker(video) {
 // =====================================================================
 
 async function startCalibration() {
-  // -------------------------------------------------------------------
-  // Prevent duplicate starts
-  // -------------------------------------------------------------------
-
   if (calibrationStarted) {
     return;
   }
@@ -1708,20 +1723,12 @@ async function startCalibration() {
     return;
   }
 
-  // -------------------------------------------------------------------
-  // Remove old retry button
-  // -------------------------------------------------------------------
-
   const oldRetry =
     el("camera-retry-btn");
 
   if (oldRetry) {
     oldRetry.remove();
   }
-
-  // -------------------------------------------------------------------
-  // Stop previous tracker if necessary
-  // -------------------------------------------------------------------
 
   if (handTracker) {
     try {
@@ -1742,10 +1749,6 @@ async function startCalibration() {
   latestHandResult =
     null;
 
-  // -------------------------------------------------------------------
-  // Reset gesture controller
-  // -------------------------------------------------------------------
-
   gestureController =
     new GestureController();
 
@@ -1753,10 +1756,6 @@ async function startCalibration() {
     x: 0,
     y: 0,
   };
-
-  // -------------------------------------------------------------------
-  // Configure video
-  // -------------------------------------------------------------------
 
   video.autoplay =
     true;
@@ -1785,10 +1784,6 @@ async function startCalibration() {
   video.style.display =
     "block";
 
-  // -------------------------------------------------------------------
-  // Canvas
-  // -------------------------------------------------------------------
-
   calibrationCanvas =
     createHandCanvas(
       video,
@@ -1799,25 +1794,13 @@ async function startCalibration() {
     calibrationCanvas
   );
 
-  // -------------------------------------------------------------------
-  // Create tracker
-  // -------------------------------------------------------------------
-
   try {
     handTracker =
       createHandTracker(
         video
       );
 
-    // ---------------------------------------------------------------
-    // START CAMERA
-    // ---------------------------------------------------------------
-
     await handTracker.start();
-
-    // ---------------------------------------------------------------
-    // Explicit video play
-    // ---------------------------------------------------------------
 
     try {
       await video.play();
@@ -1851,10 +1834,6 @@ async function startCalibration() {
       err
     );
 
-    // ---------------------------------------------------------------
-    // Cleanup
-    // ---------------------------------------------------------------
-
     if (handTracker) {
       try {
         handTracker.stop();
@@ -1880,10 +1859,6 @@ async function startCalibration() {
       x: 0,
       y: 0,
     };
-
-    // ---------------------------------------------------------------
-    // Error
-    // ---------------------------------------------------------------
 
     let message =
       cameraErrorMessage(
@@ -1977,10 +1952,6 @@ function createCameraRetryButton() {
 if (el("btn-calibrate")) {
   el("btn-calibrate").onclick =
     () => {
-      // ---------------------------------------------------------------
-      // Must actually have a hand
-      // ---------------------------------------------------------------
-
       if (
         !calibrationLandmarks ||
         calibrationLandmarks.length < 21
@@ -2074,10 +2045,6 @@ function stopCamera() {
     "[Camera] Stopping camera..."
   );
 
-  // -------------------------------------------------------------------
-  // Stop tracker
-  // -------------------------------------------------------------------
-
   if (handTracker) {
     try {
       handTracker.stop();
@@ -2091,10 +2058,6 @@ function stopCamera() {
     handTracker =
       null;
   }
-
-  // -------------------------------------------------------------------
-  // Stop previews
-  // -------------------------------------------------------------------
 
   const calibrationVideo =
     el("calibration-video");
@@ -2121,10 +2084,6 @@ function stopCamera() {
       } catch {}
     }
   );
-
-  // -------------------------------------------------------------------
-  // Reset camera data
-  // -------------------------------------------------------------------
 
   calibrationLandmarks =
     null;
@@ -2229,6 +2188,9 @@ function resetGameStateForLobby() {
   // Stop game background music.
   audioManager.stopBackgroundMusic();
 
+  // Stop meeting buzzer.
+  audioManager.stopMeetingBuzzer();
+
   showMeetingOverlay(
     false
   );
@@ -2308,10 +2270,6 @@ async function attachGameCamera() {
     return;
   }
 
-  // -------------------------------------------------------------------
-  // Configure game video
-  // -------------------------------------------------------------------
-
   gameVideo.autoplay =
     true;
 
@@ -2339,10 +2297,6 @@ async function attachGameCamera() {
   gameVideo.style.display =
     "block";
 
-  // -------------------------------------------------------------------
-  // Create overlay
-  // -------------------------------------------------------------------
-
   gameHandCanvas =
     createHandCanvas(
       gameVideo,
@@ -2352,10 +2306,6 @@ async function attachGameCamera() {
   clearHandCanvas(
     gameHandCanvas
   );
-
-  // -------------------------------------------------------------------
-  // Get stream through public HandTracker API
-  // -------------------------------------------------------------------
 
   const stream =
     handTracker.getStream();
@@ -2370,10 +2320,6 @@ async function attachGameCamera() {
 
   gameVideo.srcObject =
     stream;
-
-  // -------------------------------------------------------------------
-  // Play preview
-  // -------------------------------------------------------------------
 
   try {
     await gameVideo.play();
@@ -2416,10 +2362,6 @@ async function enterGameScreen() {
     return;
   }
 
-  // -------------------------------------------------------------------
-  // Validate camera mode
-  // -------------------------------------------------------------------
-
   if (
     !usingKeyboard &&
     !handTracker
@@ -2452,18 +2394,10 @@ async function enterGameScreen() {
   // -------------------------------------------------------------------
   // START GAME MUSIC
   // -------------------------------------------------------------------
-  //
-  // This is intentionally started only when the game screen opens.
-  // The AudioManager handles browser autoplay restrictions.
-  //
 
   audioManager.startBackgroundMusic();
 
   renderer.resize();
-
-  // -------------------------------------------------------------------
-  // Resize listener
-  // -------------------------------------------------------------------
 
   if (!rendererResizeAttached) {
     rendererResizeAttached =
@@ -2489,10 +2423,6 @@ async function enterGameScreen() {
     );
   }
 
-  // -------------------------------------------------------------------
-  // CAMERA MODE
-  // -------------------------------------------------------------------
-
   if (!usingKeyboard) {
     const cameraPanel =
       el("camera-panel");
@@ -2505,9 +2435,6 @@ async function enterGameScreen() {
     await attachGameCamera();
 
   } else {
-    // -----------------------------------------------------------------
-    // KEYBOARD MODE
-    // -----------------------------------------------------------------
 
     if (el("camera-panel")) {
       el("camera-panel").style.display =
@@ -2519,10 +2446,6 @@ async function enterGameScreen() {
       y: 0,
     };
   }
-
-  // -------------------------------------------------------------------
-  // GAME LOOP
-  // -------------------------------------------------------------------
 
   if (!gameLoopStarted) {
     gameLoopStarted =
@@ -2539,10 +2462,6 @@ async function enterGameScreen() {
     );
   }
 
-  // -------------------------------------------------------------------
-  // MOVEMENT SENDER
-  // -------------------------------------------------------------------
-
   if (!movementIntervalStarted) {
     movementIntervalStarted =
       true;
@@ -2552,10 +2471,6 @@ async function enterGameScreen() {
       1000 / 18
     );
   }
-
-  // -------------------------------------------------------------------
-  // PING
-  // -------------------------------------------------------------------
 
   if (!pingIntervalStarted) {
     pingIntervalStarted =
@@ -2667,7 +2582,6 @@ function updateGestureIndicator(
           : "UP";
     }
 
-    // Diagonal movement
     if (
       Math.abs(x) > 0.2 &&
       Math.abs(y) > 0.2
@@ -3780,8 +3694,11 @@ setInterval(
 function showResults(results) {
   stopCamera();
 
-  // Stop game music when the match ends.
+  // Stop game music.
   audioManager.stopBackgroundMusic();
+
+  // Stop meeting buzzer.
+  audioManager.stopMeetingBuzzer();
 
   calibrationStarted =
     false;
@@ -3907,6 +3824,7 @@ if (el("btn-play-again")) {
       resetCameraState();
 
       audioManager.stopBackgroundMusic();
+      audioManager.stopMeetingBuzzer();
 
       if (el("results-overlay")) {
         el("results-overlay").classList.remove(
@@ -3933,6 +3851,7 @@ if (el("btn-return-lobby")) {
       resetCameraState();
 
       audioManager.stopBackgroundMusic();
+      audioManager.stopMeetingBuzzer();
 
       if (el("results-overlay")) {
         el("results-overlay").classList.remove(
@@ -4067,11 +3986,6 @@ function updateDebugPanel() {
 // =====================================================================
 // PLAYING SETUP
 // =====================================================================
-//
-// This replaces the old situation where both game_state and a polling
-// watcher could independently start calibration.
-//
-// =====================================================================
 
 function beginPlayingSetup() {
   if (net.phase !== "PLAYING") {
@@ -4095,11 +4009,6 @@ function beginPlayingSetup() {
 
 // =====================================================================
 // PHASE WATCHER
-// =====================================================================
-//
-// Safety net only.
-// It will NOT start a second camera because beginPlayingSetup()
-// is guarded.
 // =====================================================================
 
 setInterval(
@@ -4231,6 +4140,10 @@ console.log(
 
 console.log(
   "AudioManager integration ready."
+);
+
+console.log(
+  "Meeting buzzer integration ready."
 );
 
 console.log(
