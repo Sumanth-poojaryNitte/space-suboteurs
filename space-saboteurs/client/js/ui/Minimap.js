@@ -1,3 +1,5 @@
+import { WORLD, ROOMS, CORRIDORS, DOORS } from "../game/MapData.js";
+
 const DEFAULT_WORLD = {
   width: 2000,
   height: 800,
@@ -6,17 +8,18 @@ const DEFAULT_WORLD = {
 export class Minimap {
   constructor(canvas, options = {}) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
+    this.ctx = canvas ? canvas.getContext("2d") : null;
 
     this.width = options.width || 230;
     this.height = options.height || 110;
 
-    this.world = options.world || DEFAULT_WORLD;
-    this.rooms = options.rooms || {};
+    this.world = options.world || WORLD || DEFAULT_WORLD;
+    this.rooms = options.rooms || ROOMS || {};
     this.playerId = options.playerId || null;
+    this.corridors = options.corridors || CORRIDORS || [];
+    this.doors = options.doors || DOORS || [];
 
     this.visible = true;
-
     this.padding = 8;
 
     this.roomColors = {
@@ -53,21 +56,15 @@ export class Minimap {
   }
 
   resize() {
-    if (!this.canvas) return;
+    if (!this.canvas || !this.ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
 
-    this.canvas.width =
-      Math.round(this.width * dpr);
+    this.canvas.width = Math.round(this.width * dpr);
+    this.canvas.height = Math.round(this.height * dpr);
 
-    this.canvas.height =
-      Math.round(this.height * dpr);
-
-    this.canvas.style.width =
-      `${this.width}px`;
-
-    this.canvas.style.height =
-      `${this.height}px`;
+    this.canvas.style.width = `${this.width}px`;
+    this.canvas.style.height = `${this.height}px`;
 
     this.ctx.setTransform(
       dpr,
@@ -89,63 +86,77 @@ export class Minimap {
   }
 
   worldToMap(x, y) {
+    const worldWidth =
+      Number(this.world?.width) || DEFAULT_WORLD.width;
+
+    const worldHeight =
+      Number(this.world?.height) || DEFAULT_WORLD.height;
+
     const usableWidth =
-      this.width -
-      this.padding * 2;
+      this.width - this.padding * 2;
 
     const usableHeight =
-      this.height -
-      this.padding * 2;
+      this.height - this.padding * 2;
 
     return {
       x:
         this.padding +
-        (x / this.world.width) *
-          usableWidth,
+        (Number(x) / worldWidth) * usableWidth,
 
       y:
         this.padding +
-        (y / this.world.height) *
-          usableHeight,
+        (Number(y) / worldHeight) * usableHeight,
     };
   }
 
   roomToMap(room) {
-    const p =
-      this.worldToMap(
-        room.x,
-        room.y
-      );
+    if (!room) {
+      return {
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+      };
+    }
+
+    const p = this.worldToMap(
+      room.x,
+      room.y
+    );
+
+    const worldWidth =
+      Number(this.world?.width) || DEFAULT_WORLD.width;
+
+    const worldHeight =
+      Number(this.world?.height) || DEFAULT_WORLD.height;
 
     return {
       x: p.x,
-
       y: p.y,
 
       w:
-        (room.w / this.world.width) *
-        (this.width -
-          this.padding * 2),
+        (Number(room.w) / worldWidth) *
+        (this.width - this.padding * 2),
 
       h:
-        (room.h / this.world.height) *
-        (this.height -
-          this.padding * 2),
+        (Number(room.h) / worldHeight) *
+        (this.height - this.padding * 2),
     };
   }
 
   drawBackground() {
     const ctx = this.ctx;
 
+    if (!ctx) return;
+
     ctx.save();
 
-    const gradient =
-      ctx.createLinearGradient(
-        0,
-        0,
-        0,
-        this.height
-      );
+    const gradient = ctx.createLinearGradient(
+      0,
+      0,
+      0,
+      this.height
+    );
 
     gradient.addColorStop(
       0,
@@ -172,6 +183,8 @@ export class Minimap {
   drawGrid() {
     const ctx = this.ctx;
 
+    if (!ctx) return;
+
     ctx.save();
 
     ctx.strokeStyle =
@@ -187,11 +200,17 @@ export class Minimap {
       x += gridSize
     ) {
       ctx.beginPath();
-      ctx.moveTo(x, this.padding);
+
+      ctx.moveTo(
+        x,
+        this.padding
+      );
+
       ctx.lineTo(
         x,
         this.height - this.padding
       );
+
       ctx.stroke();
     }
 
@@ -201,11 +220,17 @@ export class Minimap {
       y += gridSize
     ) {
       ctx.beginPath();
-      ctx.moveTo(this.padding, y);
+
+      ctx.moveTo(
+        this.padding,
+        y
+      );
+
       ctx.lineTo(
         this.width - this.padding,
         y
       );
+
       ctx.stroke();
     }
 
@@ -215,20 +240,21 @@ export class Minimap {
   drawRooms() {
     const ctx = this.ctx;
 
-    Object.entries(this.rooms).forEach(
+    if (!ctx) return;
+
+    Object.entries(this.rooms || {}).forEach(
       ([name, room]) => {
         if (
           !room ||
-          !Number.isFinite(room.x) ||
-          !Number.isFinite(room.y) ||
-          !Number.isFinite(room.w) ||
-          !Number.isFinite(room.h)
+          !Number.isFinite(Number(room.x)) ||
+          !Number.isFinite(Number(room.y)) ||
+          !Number.isFinite(Number(room.w)) ||
+          !Number.isFinite(Number(room.h))
         ) {
           return;
         }
 
-        const r =
-          this.roomToMap(room);
+        const r = this.roomToMap(room);
 
         const fill =
           this.roomColors[name] ||
@@ -237,7 +263,6 @@ export class Minimap {
         ctx.save();
 
         ctx.fillStyle = fill;
-
         ctx.globalAlpha = 0.92;
 
         ctx.fillRect(
@@ -273,7 +298,10 @@ export class Minimap {
             .replace(/_/g, " ")
             .toUpperCase();
 
-        if (r.w > 24 && r.h > 12) {
+        if (
+          r.w > 24 &&
+          r.h > 12
+        ) {
           ctx.fillText(
             label,
             r.x + r.w / 2,
@@ -293,6 +321,8 @@ export class Minimap {
 
     const ctx = this.ctx;
 
+    if (!ctx) return;
+
     ctx.save();
 
     corridors.forEach(
@@ -300,9 +330,7 @@ export class Minimap {
         if (!corridor) return;
 
         const r =
-          this.roomToMap(
-            corridor
-          );
+          this.roomToMap(corridor);
 
         ctx.fillStyle =
           "#111d27";
@@ -336,26 +364,28 @@ export class Minimap {
 
     const ctx = this.ctx;
 
+    if (!ctx) return;
+
     ctx.save();
 
-    doors.forEach((door) => {
-      if (!door) return;
+    doors.forEach(
+      (door) => {
+        if (!door) return;
 
-      const r =
-        this.roomToMap(
-          door
+        const r =
+          this.roomToMap(door);
+
+        ctx.fillStyle =
+          "#9aa7b2";
+
+        ctx.fillRect(
+          r.x,
+          r.y,
+          Math.max(2, r.w),
+          Math.max(2, r.h)
         );
-
-      ctx.fillStyle =
-        "#9aa7b2";
-
-      ctx.fillRect(
-        r.x,
-        r.y,
-        Math.max(2, r.w),
-        Math.max(2, r.h)
-      );
-    });
+      }
+    );
 
     ctx.restore();
   }
@@ -367,43 +397,43 @@ export class Minimap {
 
     const ctx = this.ctx;
 
+    if (!ctx) return;
+
     ctx.save();
 
-    bodies.forEach((body) => {
-      if (!body) return;
+    bodies.forEach(
+      (body) => {
+        if (!body) return;
 
-      const p =
-        this.worldToMap(
-          body.x,
-          body.y
+        const p =
+          this.worldToMap(
+            body.x,
+            body.y
+          );
+
+        ctx.fillStyle =
+          "#ff4757";
+
+        ctx.beginPath();
+
+        ctx.arc(
+          p.x,
+          p.y,
+          2.5,
+          0,
+          Math.PI * 2
         );
 
-      ctx.fillStyle =
-        "#ff4757";
+        ctx.fill();
 
-      ctx.beginPath();
+        ctx.strokeStyle =
+          "rgba(255,70,80,0.8)";
 
-      ctx.arc(
-        p.x,
-        p.y,
-        2.5,
-        0,
-        Math.PI * 2
-      );
+        ctx.lineWidth = 1;
 
-      ctx.fill();
-
-      ctx.strokeStyle =
-        "rgba(255,70,80,0.8)";
-
-      ctx.lineWidth = 1;
-
-      ctx.stroke();
-
-      ctx.restore();
-
-      ctx.save();
-    });
+        ctx.stroke();
+      }
+    );
 
     ctx.restore();
   }
@@ -412,6 +442,8 @@ export class Minimap {
     if (!sabotage) return;
 
     const ctx = this.ctx;
+
+    if (!ctx) return;
 
     ctx.save();
 
@@ -425,7 +457,7 @@ export class Minimap {
     rooms.forEach(
       (roomName) => {
         const room =
-          this.rooms[roomName];
+          this.rooms?.[roomName];
 
         if (!room) return;
 
@@ -465,30 +497,61 @@ export class Minimap {
 
     const ctx = this.ctx;
 
-    players.forEach((player) => {
-      if (!player) return;
+    if (!ctx) return;
 
-      if (!player.connected) {
-        return;
-      }
+    players.forEach(
+      (player) => {
+        if (!player) return;
 
-      const p =
-        this.worldToMap(
-          player.x,
-          player.y
-        );
+        if (player.connected === false) {
+          return;
+        }
 
-      const isSelf =
-        player.id === this.playerId;
+        const p =
+          this.worldToMap(
+            player.x,
+            player.y
+          );
 
-      const radius =
-        isSelf ? 3.5 : 2.7;
+        const isSelf =
+          player.id === this.playerId;
 
-      ctx.save();
+        const radius =
+          isSelf ? 3.5 : 2.7;
 
-      if (!player.alive) {
+        ctx.save();
+
+        if (!player.alive) {
+          ctx.fillStyle =
+            "rgba(120,120,120,0.5)";
+
+          ctx.beginPath();
+
+          ctx.arc(
+            p.x,
+            p.y,
+            radius,
+            0,
+            Math.PI * 2
+          );
+
+          ctx.fill();
+
+          ctx.restore();
+
+          return;
+        }
+
+        if (isSelf) {
+          ctx.shadowColor =
+            "#ffffff";
+
+          ctx.shadowBlur = 7;
+        }
+
         ctx.fillStyle =
-          "rgba(120,120,120,0.5)";
+          player.color ||
+          "#4dabf7";
 
         ctx.beginPath();
 
@@ -502,52 +565,27 @@ export class Minimap {
 
         ctx.fill();
 
+        ctx.strokeStyle =
+          isSelf
+            ? "#ffffff"
+            : "rgba(255,255,255,0.5)";
+
+        ctx.lineWidth =
+          isSelf ? 1.2 : 0.7;
+
+        ctx.stroke();
+
         ctx.restore();
-
-        return;
       }
-
-      if (isSelf) {
-        ctx.shadowColor =
-          "#ffffff";
-
-        ctx.shadowBlur = 7;
-      }
-
-      ctx.fillStyle =
-        player.color ||
-        "#4dabf7";
-
-      ctx.beginPath();
-
-      ctx.arc(
-        p.x,
-        p.y,
-        radius,
-        0,
-        Math.PI * 2
-      );
-
-      ctx.fill();
-
-      ctx.strokeStyle =
-        isSelf
-          ? "#ffffff"
-          : "rgba(255,255,255,0.5)";
-
-      ctx.lineWidth =
-        isSelf ? 1.2 : 0.7;
-
-      ctx.stroke();
-
-      ctx.restore();
-    });
+    );
   }
 
   drawPlayerArrow(player) {
     if (!player) return;
 
     const ctx = this.ctx;
+
+    if (!ctx) return;
 
     const p =
       this.worldToMap(
@@ -562,7 +600,10 @@ export class Minimap {
       Number(player.input?.y) || 0;
 
     const length =
-      Math.hypot(dx, dy);
+      Math.hypot(
+        dx,
+        dy
+      );
 
     if (length < 0.05) {
       return;
@@ -636,6 +677,8 @@ export class Minimap {
   drawFrame() {
     const ctx = this.ctx;
 
+    if (!ctx) return;
+
     ctx.save();
 
     ctx.strokeStyle =
@@ -668,6 +711,8 @@ export class Minimap {
   drawLabel() {
     const ctx = this.ctx;
 
+    if (!ctx) return;
+
     ctx.save();
 
     ctx.fillStyle =
@@ -698,6 +743,73 @@ export class Minimap {
     ctx.restore();
   }
 
+  draw(net, electricalSabotage = false) {
+    if (!net) return;
+
+    let players = [];
+
+    if (net.players instanceof Map) {
+      players =
+        Array.from(
+          net.players.values()
+        );
+    } else if (
+      Array.isArray(net.players)
+    ) {
+      players = net.players;
+    }
+
+    this.playerId =
+      net.playerId ||
+      this.playerId;
+
+    this.world =
+      WORLD ||
+      DEFAULT_WORLD;
+
+    this.rooms =
+      ROOMS ||
+      {};
+
+    this.corridors =
+      CORRIDORS ||
+      [];
+
+    this.doors =
+      DOORS ||
+      [];
+
+    const sabotage =
+      electricalSabotage
+        ? {
+            fixRoomsNeeded: [
+              "electrical",
+            ],
+            fixedRooms: [],
+          }
+        : net.sabotage ||
+          null;
+
+    this.render({
+      players,
+      bodies:
+        Array.isArray(net.bodies)
+          ? net.bodies
+          : [],
+
+      sabotage,
+
+      corridors:
+        this.corridors,
+
+      doors:
+        this.doors,
+
+      localPlayer:
+        net.me || null,
+    });
+  }
+
   render({
     players = [],
     bodies = [],
@@ -706,7 +818,10 @@ export class Minimap {
     doors = [],
     localPlayer = null,
   } = {}) {
-    if (!this.canvas || !this.ctx) {
+    if (
+      !this.canvas ||
+      !this.ctx
+    ) {
       return;
     }
 
