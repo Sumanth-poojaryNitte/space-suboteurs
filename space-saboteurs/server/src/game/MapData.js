@@ -1,6 +1,6 @@
 // ============================================================
 // SPACE SABOTEURS - AUTHORITATIVE MAP DATA
-// Server-side collision, rooms, tasks and spawn geometry.
+// Server-side collision, rooms, corridors, tasks and geometry.
 // ============================================================
 
 const WORLD = {
@@ -8,9 +8,9 @@ const WORLD = {
   height: 800,
 };
 
-// ------------------------------------------------------------
+// ============================================================
 // ROOMS
-// ------------------------------------------------------------
+// ============================================================
 
 const ROOMS = {
   cafeteria: {
@@ -86,87 +86,114 @@ const ROOMS = {
   },
 };
 
-// ------------------------------------------------------------
+// ============================================================
 // CORRIDORS
-// ------------------------------------------------------------
+//
+// IMPORTANT:
+//
+// Corridors intentionally overlap the room boundaries.
+// This gives the player's collision circle enough space to
+// pass through doorways instead of getting stuck at the edge
+// where two rectangles only touch.
+//
+// The overlap is approximately 30-40 world units.
+// ============================================================
 
 const CORRIDORS = [
+  // Reactor <-> Cafeteria
   {
     id: "corridor_reactor_cafeteria",
-    x: 380,
-    y: 180,
-    w: 320,
-    h: 100,
+    x: 350,
+    y: 175,
+    w: 380,
+    h: 110,
+    type: "horizontal",
   },
 
+  // Reactor <-> Electrical
   {
     id: "corridor_reactor_electrical",
-    x: 360,
-    y: 340,
-    w: 60,
-    h: 180,
+    x: 345,
+    y: 315,
+    w: 80,
+    h: 215,
+    type: "vertical",
   },
 
+  // Electrical <-> Medbay
   {
     id: "corridor_electrical_medbay",
-    x: 360,
-    y: 480,
-    w: 100,
-    h: 100,
+    x: 330,
+    y: 475,
+    w: 165,
+    h: 110,
+    type: "horizontal",
   },
 
+  // Medbay <-> Security
   {
     id: "corridor_medbay_security",
-    x: 720,
-    y: 480,
-    w: 100,
-    h: 100,
+    x: 700,
+    y: 475,
+    w: 155,
+    h: 110,
+    type: "horizontal",
   },
 
+  // Cafeteria <-> Admin
   {
     id: "corridor_cafeteria_admin",
-    x: 900,
-    y: 200,
-    w: 280,
-    h: 80,
+    x: 895,
+    y: 190,
+    w: 325,
+    h: 100,
+    type: "horizontal",
   },
 
+  // Admin <-> Navigation
   {
     id: "corridor_admin_navigation",
-    x: 1480,
-    y: 160,
-    w: 140,
-    h: 100,
+    x: 1450,
+    y: 150,
+    w: 205,
+    h: 120,
+    type: "horizontal",
   },
 
+  // Security <-> Storage
   {
     id: "corridor_security_storage",
-    x: 1060,
-    y: 500,
-    w: 120,
-    h: 100,
+    x: 1045,
+    y: 485,
+    w: 165,
+    h: 115,
+    type: "horizontal",
   },
 
+  // Storage <-> Communications
   {
     id: "corridor_storage_comms",
-    x: 1500,
-    y: 500,
-    w: 120,
-    h: 100,
+    x: 1485,
+    y: 485,
+    w: 170,
+    h: 115,
+    type: "horizontal",
   },
 
+  // Admin <-> Storage
   {
     id: "corridor_admin_storage",
-    x: 1320,
-    y: 340,
-    w: 60,
-    h: 140,
+    x: 1300,
+    y: 315,
+    w: 100,
+    h: 175,
+    type: "vertical",
   },
 ];
 
-// ------------------------------------------------------------
+// ============================================================
 // OBSTACLES
-// ------------------------------------------------------------
+// ============================================================
 
 const OBSTACLES = [
   // Cafeteria
@@ -341,114 +368,140 @@ const OBSTACLES = [
   },
 ];
 
-// ------------------------------------------------------------
+// ============================================================
 // DOORS
-// ------------------------------------------------------------
+//
+// Doors are primarily used by the renderer/game UI.
+// Collision is handled by the connected room/corridor
+// geometry above.
+// ============================================================
 
 const DOORS = [
   {
     id: "door_reactor",
-    x: 380,
-    y: 214,
-    w: 24,
-    h: 32,
+    x: 370,
+    y: 210,
+    w: 35,
+    h: 40,
     orientation: "vertical",
     roomA: "reactor",
-    roomB: "corridor",
+    roomB: "corridor_reactor_cafeteria",
   },
 
   {
     id: "door_cafeteria_w",
     x: 690,
-    y: 214,
-    w: 24,
-    h: 32,
+    y: 210,
+    w: 35,
+    h: 40,
     orientation: "vertical",
     roomA: "cafeteria",
-    roomB: "corridor",
+    roomB: "corridor_reactor_cafeteria",
   },
 
   {
-    id: "door_cafeteria_e",
-    x: 1168,
-    y: 214,
-    w: 24,
-    h: 32,
+    id: "door_cafeteria_admin",
+    x: 1165,
+    y: 210,
+    w: 35,
+    h: 40,
     orientation: "vertical",
     roomA: "cafeteria",
-    roomB: "corridor",
+    roomB: "corridor_cafeteria_admin",
   },
 
   {
-    id: "door_admin",
-    x: 1470,
-    y: 194,
-    w: 24,
-    h: 32,
+    id: "door_admin_navigation",
+    x: 1465,
+    y: 190,
+    w: 40,
+    h: 40,
     orientation: "vertical",
     roomA: "admin",
-    roomB: "corridor",
+    roomB: "corridor_admin_navigation",
   },
 
   {
-    id: "door_nav",
-    x: 1610,
-    y: 194,
-    w: 24,
-    h: 32,
+    id: "door_navigation",
+    x: 1605,
+    y: 190,
+    w: 35,
+    h: 40,
     orientation: "vertical",
     roomA: "navigation",
-    roomB: "corridor",
+    roomB: "corridor_admin_navigation",
   },
 
   {
-    id: "door_medbay",
-    x: 560,
-    y: 448,
-    w: 34,
-    h: 24,
+    id: "door_reactor_electrical",
+    x: 350,
+    y: 325,
+    w: 40,
+    h: 35,
+    orientation: "horizontal",
+    roomA: "reactor",
+    roomB: "corridor_reactor_electrical",
+  },
+
+  {
+    id: "door_electrical_medbay",
+    x: 445,
+    y: 495,
+    w: 40,
+    h: 35,
+    orientation: "horizontal",
+    roomA: "electrical",
+    roomB: "corridor_electrical_medbay",
+  },
+
+  {
+    id: "door_medbay_security",
+    x: 705,
+    y: 495,
+    w: 40,
+    h: 35,
     orientation: "horizontal",
     roomA: "medbay",
-    roomB: "corridor",
+    roomB: "corridor_medbay_security",
   },
 
   {
-    id: "door_security",
-    x: 900,
-    y: 448,
-    w: 34,
-    h: 24,
-    orientation: "horizontal",
+    id: "door_security_storage",
+    x: 1045,
+    y: 515,
+    w: 40,
+    h: 35,
+    orientation: "vertical",
     roomA: "security",
-    roomB: "corridor",
+    roomB: "corridor_security_storage",
   },
 
   {
-    id: "door_storage",
-    x: 1320,
-    y: 448,
-    w: 24,
-    h: 32,
+    id: "door_storage_comms",
+    x: 1485,
+    y: 515,
+    w: 40,
+    h: 35,
     orientation: "vertical",
     roomA: "storage",
-    roomB: "corridor",
+    roomB: "corridor_storage_comms",
   },
 
   {
-    id: "door_comms",
-    x: 1610,
-    y: 540,
-    w: 24,
-    h: 32,
-    orientation: "vertical",
-    roomA: "communications",
-    roomB: "corridor",
+    id: "door_admin_storage",
+    x: 1325,
+    y: 330,
+    w: 45,
+    h: 35,
+    orientation: "horizontal",
+    roomA: "admin",
+    roomB: "corridor_admin_storage",
   },
 ];
 
-// ------------------------------------------------------------
-// PLAYER SPAWN POINTS
-// ------------------------------------------------------------
+// ============================================================
+// SPAWN POINTS
+// ============================================================
 
 const SPAWN_POINTS = [
   { x: 950, y: 240 },
@@ -463,9 +516,9 @@ const SPAWN_POINTS = [
   { x: 1050, y: 300 },
 ];
 
-// ------------------------------------------------------------
+// ============================================================
 // TASK DEFINITIONS
-// ------------------------------------------------------------
+// ============================================================
 
 const TASK_DEFINITIONS = [
   {
@@ -549,9 +602,9 @@ const TASK_DEFINITIONS = [
   },
 ];
 
-// ------------------------------------------------------------
+// ============================================================
 // SABOTAGE TYPES
-// ------------------------------------------------------------
+// ============================================================
 
 const SABOTAGE_TYPES = {
   oxygen: {
@@ -598,6 +651,7 @@ function pointInRect(x, y, rect) {
   );
 }
 
+// Checks whether the entire player circle fits inside a rectangle.
 function rectContainsCircle(rect, x, y, radius) {
   return (
     x - radius >= rect.x &&
@@ -607,6 +661,7 @@ function rectContainsCircle(rect, x, y, radius) {
   );
 }
 
+// Checks whether a circle intersects a rectangle.
 function circleIntersectsRect(x, y, radius, rect) {
   const closestX = Math.max(
     rect.x,
@@ -621,8 +676,15 @@ function circleIntersectsRect(x, y, radius, rect) {
   const dx = x - closestX;
   const dy = y - closestY;
 
-  return dx * dx + dy * dy < radius * radius;
+  return (
+    dx * dx + dy * dy <
+    radius * radius
+  );
 }
+
+// ============================================================
+// ROOM LOOKUP
+// ============================================================
 
 function roomAt(x, y) {
   for (const [name, room] of Object.entries(ROOMS)) {
@@ -635,30 +697,49 @@ function roomAt(x, y) {
 }
 
 // ============================================================
-// WALKABLE AREA
-//
-// A player may only exist inside one of the defined rooms or
-// corridors. The player's radius is included in the check so
-// the player cannot put half of their body through a wall.
+// ALL WALKABLE AREAS
 // ============================================================
 
-function walkableAt(x, y, radius = 14) {
-  const playableAreas = [
+function getWalkableAreas() {
+  return [
     ...Object.values(ROOMS),
     ...CORRIDORS,
   ];
+}
 
-  // The complete player circle must remain inside at least one
-  // playable rectangle.
-  const insidePlayableArea = playableAreas.some((rect) =>
-    rectContainsCircle(rect, x, y, radius)
-  );
+// ============================================================
+// WALKABLE CHECK
+//
+// A position is walkable when:
+//
+// 1. The complete player circle is inside at least one
+//    room/corridor area.
+//
+// 2. The player circle does not collide with an obstacle.
+//
+// Because corridors overlap room boundaries, players can
+// smoothly transition between connected areas.
+// ============================================================
+
+function walkableAt(x, y, radius = 14) {
+  const playableAreas =
+    getWalkableAreas();
+
+  const insidePlayableArea =
+    playableAreas.some((rect) =>
+      rectContainsCircle(
+        rect,
+        x,
+        y,
+        radius
+      )
+    );
 
   if (!insidePlayableArea) {
     return false;
   }
 
-  // Do not allow the player to enter obstacles.
+  // Prevent walking through station obstacles.
   for (const obstacle of OBSTACLES) {
     if (
       circleIntersectsRect(
@@ -676,16 +757,31 @@ function walkableAt(x, y, radius = 14) {
 }
 
 // ============================================================
-// FIND NEAREST VALID POSITION
+// CLAMP TO WALKABLE
+//
+// Used when a player somehow starts or ends up in an invalid
+// location. Searches nearby for the closest valid location.
 // ============================================================
 
-function clampToWalkable(x, y, radius = 14) {
-  if (walkableAt(x, y, radius)) {
-    return { x, y };
+function clampToWalkable(
+  x,
+  y,
+  radius = 14
+) {
+  if (
+    walkableAt(
+      x,
+      y,
+      radius
+    )
+  ) {
+    return {
+      x,
+      y,
+    };
   }
 
-  // First search nearby with small increments.
-  const maxDistance = 160;
+  const maxDistance = 180;
   const step = 4;
 
   let best = null;
@@ -702,67 +798,114 @@ function clampToWalkable(x, y, radius = 14) {
       { x, y: y - distance },
       { x, y: y + distance },
 
-      { x: x - distance, y: y - distance },
-      { x: x + distance, y: y - distance },
-      { x: x - distance, y: y + distance },
-      { x: x + distance, y: y + distance },
+      {
+        x: x - distance,
+        y: y - distance,
+      },
+
+      {
+        x: x + distance,
+        y: y - distance,
+      },
+
+      {
+        x: x - distance,
+        y: y + distance,
+      },
+
+      {
+        x: x + distance,
+        y: y + distance,
+      },
     ];
 
     for (const candidate of candidates) {
-      if (!walkableAt(candidate.x, candidate.y, radius)) {
+      if (
+        !walkableAt(
+          candidate.x,
+          candidate.y,
+          radius
+        )
+      ) {
         continue;
       }
 
-      const d =
-        (candidate.x - x) ** 2 +
-        (candidate.y - y) ** 2;
+      const dx =
+        candidate.x - x;
 
-      if (d < bestDistance) {
-        bestDistance = d;
+      const dy =
+        candidate.y - y;
+
+      const distanceSquared =
+        dx * dx +
+        dy * dy;
+
+      if (
+        distanceSquared <
+        bestDistance
+      ) {
+        bestDistance =
+          distanceSquared;
+
         best = candidate;
       }
     }
 
-    // Once we found a position at this distance, the next
-    // distance cannot produce a closer position.
     if (best) {
       break;
     }
   }
 
-  if (best) {
-    return best;
-  }
-
-  // Absolute fallback: use a known safe spawn.
-  for (const spawn of SPAWN_POINTS) {
-    if (walkableAt(spawn.x, spawn.y, radius)) {
-      return {
-        x: spawn.x,
-        y: spawn.y,
-      };
+  // Fall back to a valid spawn.
+  if (!best) {
+    for (const spawn of SPAWN_POINTS) {
+      if (
+        walkableAt(
+          spawn.x,
+          spawn.y,
+          radius
+        )
+      ) {
+        return {
+          x: spawn.x,
+          y: spawn.y,
+        };
+      }
     }
   }
 
-  // This should never happen with the current map.
+  // Final safety fallback.
   return {
     x: Math.max(
       radius,
-      Math.min(WORLD.width - radius, x)
+      Math.min(
+        WORLD.width - radius,
+        x
+      )
     ),
+
     y: Math.max(
       radius,
-      Math.min(WORLD.height - radius, y)
+      Math.min(
+        WORLD.height - radius,
+        y
+      )
     ),
   };
 }
 
 // ============================================================
-// COLLISION-AWARE MOVEMENT
+// MOVEMENT RESOLUTION
 //
-// Horizontal and vertical movement are tested separately.
-// This allows the player to slide along walls instead of
-// getting completely stuck when moving diagonally.
+// The player moves one axis at a time.
+//
+// This means:
+//
+// - Walls block the player.
+// - Obstacles block the player.
+// - The player can slide along walls.
+// - Diagonal movement does not get stuck as easily.
+// - Room/corridor transitions remain possible.
 // ============================================================
 
 function resolvePlayerMovement(
@@ -772,43 +915,78 @@ function resolvePlayerMovement(
   ny,
   radius = 14
 ) {
-  let resolvedX = x;
-  let resolvedY = y;
-
-  // Keep movement inside the world itself.
+  // Keep the requested destination inside the world.
   nx = Math.max(
     radius,
-    Math.min(WORLD.width - radius, nx)
+    Math.min(
+      WORLD.width - radius,
+      nx
+    )
   );
 
   ny = Math.max(
     radius,
-    Math.min(WORLD.height - radius, ny)
+    Math.min(
+      WORLD.height - radius,
+      ny
+    )
   );
 
-  // Try horizontal movement.
-  if (walkableAt(nx, y, radius)) {
+  let resolvedX = x;
+  let resolvedY = y;
+
+  // ----------------------------------------------------------
+  // X AXIS
+  // ----------------------------------------------------------
+
+  if (
+    walkableAt(
+      nx,
+      y,
+      radius
+    )
+  ) {
     resolvedX = nx;
   }
 
-  // Try vertical movement using the resolved X.
-  if (walkableAt(resolvedX, ny, radius)) {
+  // ----------------------------------------------------------
+  // Y AXIS
+  // ----------------------------------------------------------
+
+  if (
+    walkableAt(
+      resolvedX,
+      ny,
+      radius
+    )
+  ) {
     resolvedY = ny;
   }
 
-  // Final safety check.
-  if (!walkableAt(resolvedX, resolvedY, radius)) {
-    return clampToWalkable(
+  // ----------------------------------------------------------
+  // FINAL VALIDATION
+  // ----------------------------------------------------------
+
+  if (
+    walkableAt(
       resolvedX,
       resolvedY,
       radius
-    );
+    )
+  ) {
+    return {
+      x: resolvedX,
+      y: resolvedY,
+    };
   }
 
-  return {
-    x: resolvedX,
-    y: resolvedY,
-  };
+  // If the calculated position is invalid,
+  // search for the closest valid point.
+  return clampToWalkable(
+    resolvedX,
+    resolvedY,
+    radius
+  );
 }
 
 // ============================================================
@@ -817,15 +995,26 @@ function resolvePlayerMovement(
 
 module.exports = {
   WORLD,
+
   ROOMS,
+
   CORRIDORS,
+
   OBSTACLES,
+
   DOORS,
+
   SPAWN_POINTS,
+
   TASK_DEFINITIONS,
+
   SABOTAGE_TYPES,
+
   roomAt,
+
   walkableAt,
+
   clampToWalkable,
+
   resolvePlayerMovement,
 };

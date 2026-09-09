@@ -10,7 +10,7 @@ const INDEX_PIP = 6;
 
 const MIDDLE_TIP = 12;
 const MIDDLE_PIP = 10;
-const MIDDLE_MCP = 9; // stable palm-center reference
+const MIDDLE_MCP = 9;
 
 const RING_TIP = 16;
 const RING_PIP = 14;
@@ -23,17 +23,14 @@ const PINKY_PIP = 18;
 // MOVEMENT SETTINGS
 // ---------------------------------------------------------
 
-// How long we allow the hand to disappear before stopping.
 const LOST_HAND_TIMEOUT_MS = 350;
 
-// Lower values = slower / less sensitive.
-// Reduced from 1.15 to 0.85 for more controlled movement.
-const AMPLIFICATION_X = 0.85;
-const AMPLIFICATION_Y = 0.85;
+// Increased for faster hand movement.
+const AMPLIFICATION_X = 1.35;
+const AMPLIFICATION_Y = 1.35;
 
-// Dead zone around calibrated hand position.
-// Increased from 0.12 to 0.15 to reduce accidental movement.
-const DEAD_ZONE = 0.15;
+// Smaller dead zone makes small hand movements responsive.
+const DEAD_ZONE = 0.08;
 
 
 // ---------------------------------------------------------
@@ -44,13 +41,9 @@ export class GestureController {
 
   constructor() {
 
-    // Smoothing factor.
-    // Lower = smoother/slower
-    // Higher = faster/more responsive
-    // Reduced from 0.25 to 0.18 for steadier movement.
-    this.smoother = new Vec2Smoother(0.18);
+    // Higher smoothing response = faster reaction.
+    this.smoother = new Vec2Smoother(0.35);
 
-    // Neutral hand position captured during calibration.
     this.neutral = {
       x: 0.5,
       y: 0.5
@@ -86,7 +79,6 @@ export class GestureController {
       y: p.y
     };
 
-    // Start movement from zero after calibration.
     this.smoother.reset();
 
     this.movement = {
@@ -106,7 +98,6 @@ export class GestureController {
 
   update(result) {
 
-    // Not calibrated yet.
     if (!this.calibrated) {
 
       return {
@@ -136,14 +127,15 @@ export class GestureController {
 
     if (lostHand) {
 
-      // Smoothly return to zero.
-      const eased = this.smoother.push(0, 0);
+      const eased =
+        this.smoother.push(0, 0);
 
-      this.movement = clampVec(
-        eased.x,
-        eased.y,
-        1
-      );
+      this.movement =
+        clampVec(
+          eased.x,
+          eased.y,
+          1
+        );
 
       this.currentGesture = "NONE";
 
@@ -162,10 +154,11 @@ export class GestureController {
 
 
     // -----------------------------------------------------
-    // GET PALM POSITION
+    // GET LANDMARKS
     // -----------------------------------------------------
 
-    const landmarks = result.landmarks;
+    const landmarks =
+      result.landmarks;
 
     if (
       !landmarks ||
@@ -187,46 +180,24 @@ export class GestureController {
     }
 
 
-    const palm = landmarks[MIDDLE_MCP];
+    const palm =
+      landmarks[MIDDLE_MCP];
 
 
     // -----------------------------------------------------
-    // CALCULATE HAND MOVEMENT
+    // CALCULATE MOVEMENT
     // -----------------------------------------------------
 
-    /*
-      IMPORTANT:
-
-      MediaPipe X:
-
-        0 = left side of camera
-        1 = right side of camera
-
-      Because the camera preview is mirrored for selfie view,
-      we invert X here.
-
-      Therefore:
-
-        Move hand LEFT  -> player LEFT
-        Move hand RIGHT -> player RIGHT
-    */
-
+    // Camera X is mirrored.
     const handDeltaX =
       this.neutral.x - palm.x;
 
-
-    /*
-      Y does not need mirroring.
-
-        Move hand UP   -> player UP
-        Move hand DOWN -> player DOWN
-    */
-
+    // Y direction.
     const handDeltaY =
       palm.y - this.neutral.y;
 
 
-    // Apply reduced sensitivity.
+    // Increased amplification.
     let rawX =
       handDeltaX * AMPLIFICATION_X;
 
@@ -238,32 +209,35 @@ export class GestureController {
     // DEAD ZONE
     // -----------------------------------------------------
 
-    const deadZoned = applyDeadZone(
-      rawX,
-      rawY,
-      DEAD_ZONE
-    );
+    const deadZoned =
+      applyDeadZone(
+        rawX,
+        rawY,
+        DEAD_ZONE
+      );
 
 
     // -----------------------------------------------------
     // SMOOTHING
     // -----------------------------------------------------
 
-    const smoothed = this.smoother.push(
-      deadZoned.x,
-      deadZoned.y
-    );
+    const smoothed =
+      this.smoother.push(
+        deadZoned.x,
+        deadZoned.y
+      );
 
 
     // -----------------------------------------------------
-    // CLAMP MOVEMENT
+    // CLAMP
     // -----------------------------------------------------
 
-    this.movement = clampVec(
-      smoothed.x,
-      smoothed.y,
-      1
-    );
+    this.movement =
+      clampVec(
+        smoothed.x,
+        smoothed.y,
+        1
+      );
 
 
     // -----------------------------------------------------
@@ -285,25 +259,29 @@ export class GestureController {
 
 
     // -----------------------------------------------------
-    // RETURN RESULT
+    // RETURN
     // -----------------------------------------------------
 
     return {
 
-      movement: this.movement,
+      movement:
+        this.movement,
 
-      gesture: this.currentGesture,
+      gesture:
+        this.currentGesture,
 
-      handDetected: true,
+      handDetected:
+        true,
 
-      confidence: this.confidence
+      confidence:
+        this.confidence
     };
   }
 }
 
 
 // ---------------------------------------------------------
-// DISTANCE BETWEEN TWO LANDMARKS
+// DISTANCE BETWEEN LANDMARKS
 // ---------------------------------------------------------
 
 function dist(a, b) {
