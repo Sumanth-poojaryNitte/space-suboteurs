@@ -5,6 +5,7 @@ import { GestureController } from "./gesture/GestureController.js";
 import { Renderer } from "./game/Renderer.js";
 import { Minimap } from "./ui/Minimap.js";
 import { SABOTAGE_ROOMS, roomAt } from "./game/MapData.js";
+import { AudioManager } from "./audio/AudioManager.js";
 
 // =====================================================================
 // SPACE SABOTEURS - MAIN
@@ -29,6 +30,10 @@ import { SABOTAGE_ROOMS, roomAt } from "./game/MapData.js";
 // IMPORTANT:
 // HandTracker receives ONE permanent onResults callback.
 // We do NOT replace handTracker.onResults after start().
+//
+// AUDIO:
+// Background music starts when the actual game screen starts.
+// Kill sound plays when a player_killed event is received.
 // =====================================================================
 
 
@@ -49,6 +54,12 @@ const renderer = new Renderer(canvas);
 const minimap = new Minimap(
   document.getElementById("minimap-canvas")
 );
+
+// ---------------------------------------------------------------------
+// AUDIO
+// ---------------------------------------------------------------------
+
+const audioManager = new AudioManager();
 
 
 // =====================================================================
@@ -471,6 +482,9 @@ function onJoinedRoom(res) {
   stopCamera();
   resetCameraState();
 
+  // Stop any previous game music.
+  audioManager.stopBackgroundMusic();
+
   showModal(
     "modal-name",
     false
@@ -644,6 +658,10 @@ function wireSocketEvents() {
   socketClient.on(
     "player_killed",
     (d) => {
+      // Play the kill sound whenever a kill event
+      // is received from the server.
+      audioManager.playKillSound();
+
       if (d?.victimName) {
         logEvent(
           `${d.victimName} was killed.`
@@ -1053,6 +1071,8 @@ if (el("btn-leave-lobby")) {
 
       stopCamera();
       resetCameraState();
+
+      audioManager.stopBackgroundMusic();
 
       showScreen(
         "screen-menu"
@@ -1814,7 +1834,7 @@ async function startCalibration() {
     );
 
     setCalibrationStatus(
-      "Camera active — show your open hand inside the box."
+      "Camera active — show your open hand inside the camera box."
     );
 
     console.log(
@@ -2206,6 +2226,9 @@ function resetGameStateForLobby() {
 
   resetCameraState();
 
+  // Stop game background music.
+  audioManager.stopBackgroundMusic();
+
   showMeetingOverlay(
     false
   );
@@ -2387,6 +2410,9 @@ async function enterGameScreen() {
       "screen-game"
     );
 
+    // Make sure music is running.
+    audioManager.startBackgroundMusic();
+
     return;
   }
 
@@ -2422,6 +2448,16 @@ async function enterGameScreen() {
   showScreen(
     "screen-game"
   );
+
+  // -------------------------------------------------------------------
+  // START GAME MUSIC
+  // -------------------------------------------------------------------
+  //
+  // This is intentionally started only when the game screen opens.
+  // The AudioManager handles browser autoplay restrictions.
+  //
+
+  audioManager.startBackgroundMusic();
 
   renderer.resize();
 
@@ -3744,6 +3780,9 @@ setInterval(
 function showResults(results) {
   stopCamera();
 
+  // Stop game music when the match ends.
+  audioManager.stopBackgroundMusic();
+
   calibrationStarted =
     false;
 
@@ -3867,6 +3906,8 @@ if (el("btn-play-again")) {
 
       resetCameraState();
 
+      audioManager.stopBackgroundMusic();
+
       if (el("results-overlay")) {
         el("results-overlay").classList.remove(
           "active"
@@ -3890,6 +3931,8 @@ if (el("btn-return-lobby")) {
       stopCamera();
 
       resetCameraState();
+
+      audioManager.stopBackgroundMusic();
 
       if (el("results-overlay")) {
         el("results-overlay").classList.remove(
@@ -4184,6 +4227,10 @@ console.log(
 
 console.log(
   "GestureController integration ready."
+);
+
+console.log(
+  "AudioManager integration ready."
 );
 
 console.log(
