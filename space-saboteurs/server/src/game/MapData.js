@@ -166,11 +166,10 @@ const CORRIDORS = [
 
 // ------------------------------------------------------------
 // OBSTACLES
-// These are authoritative collision objects.
 // ------------------------------------------------------------
 
 const OBSTACLES = [
-  // Cafeteria tables
+  // Cafeteria
   {
     id: "caf_table_1",
     x: 790,
@@ -452,55 +451,16 @@ const DOORS = [
 // ------------------------------------------------------------
 
 const SPAWN_POINTS = [
-  {
-    x: 950,
-    y: 240,
-  },
-
-  {
-    x: 900,
-    y: 200,
-  },
-
-  {
-    x: 1000,
-    y: 200,
-  },
-
-  {
-    x: 950,
-    y: 280,
-  },
-
-  {
-    x: 900,
-    y: 300,
-  },
-
-  {
-    x: 1000,
-    y: 300,
-  },
-
-  {
-    x: 850,
-    y: 240,
-  },
-
-  {
-    x: 1050,
-    y: 240,
-  },
-
-  {
-    x: 850,
-    y: 300,
-  },
-
-  {
-    x: 1050,
-    y: 300,
-  },
+  { x: 950, y: 240 },
+  { x: 900, y: 200 },
+  { x: 1000, y: 200 },
+  { x: 950, y: 280 },
+  { x: 900, y: 300 },
+  { x: 1000, y: 300 },
+  { x: 850, y: 240 },
+  { x: 1050, y: 240 },
+  { x: 850, y: 300 },
+  { x: 1050, y: 300 },
 ];
 
 // ------------------------------------------------------------
@@ -597,34 +557,25 @@ const SABOTAGE_TYPES = {
   oxygen: {
     label: "Oxygen",
     timerMs: 45000,
-    fixRooms: [
-      "cafeteria",
-      "electrical",
-    ],
+    fixRooms: ["cafeteria", "electrical"],
   },
 
   reactor: {
     label: "Reactor Meltdown",
     timerMs: 40000,
-    fixRooms: [
-      "reactor",
-    ],
+    fixRooms: ["reactor"],
   },
 
   electrical: {
     label: "Lights",
     timerMs: 60000,
-    fixRooms: [
-      "electrical",
-    ],
+    fixRooms: ["electrical"],
   },
 
   communications: {
     label: "Communications",
     timerMs: 60000,
-    fixRooms: [
-      "communications",
-    ],
+    fixRooms: ["communications"],
   },
 
   doors: {
@@ -634,15 +585,11 @@ const SABOTAGE_TYPES = {
   },
 };
 
-// ------------------------------------------------------------
+// ============================================================
 // GEOMETRY HELPERS
-// ------------------------------------------------------------
+// ============================================================
 
-function pointInRect(
-  x,
-  y,
-  rect
-) {
+function pointInRect(x, y, rect) {
   return (
     x >= rect.x &&
     x <= rect.x + rect.w &&
@@ -651,17 +598,35 @@ function pointInRect(
   );
 }
 
+function rectContainsCircle(rect, x, y, radius) {
+  return (
+    x - radius >= rect.x &&
+    x + radius <= rect.x + rect.w &&
+    y - radius >= rect.y &&
+    y + radius <= rect.y + rect.h
+  );
+}
+
+function circleIntersectsRect(x, y, radius, rect) {
+  const closestX = Math.max(
+    rect.x,
+    Math.min(x, rect.x + rect.w)
+  );
+
+  const closestY = Math.max(
+    rect.y,
+    Math.min(y, rect.y + rect.h)
+  );
+
+  const dx = x - closestX;
+  const dy = y - closestY;
+
+  return dx * dx + dy * dy < radius * radius;
+}
+
 function roomAt(x, y) {
-  for (
-    const [name, room] of Object.entries(ROOMS)
-  ) {
-    if (
-      pointInRect(
-        x,
-        y,
-        room
-      )
-    ) {
+  for (const [name, room] of Object.entries(ROOMS)) {
+    if (pointInRect(x, y, room)) {
       return name;
     }
   }
@@ -669,151 +634,99 @@ function roomAt(x, y) {
   return null;
 }
 
-// ------------------------------------------------------------
-// WALKABLE CHECK
-// ------------------------------------------------------------
+// ============================================================
+// WALKABLE AREA
+//
+// A player may only exist inside one of the defined rooms or
+// corridors. The player's radius is included in the check so
+// the player cannot put half of their body through a wall.
+// ============================================================
 
-function walkableAt(
-  x,
-  y,
-  radius = 0
-) {
+function walkableAt(x, y, radius = 14) {
   const playableAreas = [
     ...Object.values(ROOMS),
     ...CORRIDORS,
   ];
 
-  const insidePlayableArea =
-    playableAreas.some(
-      (rect) =>
-        x >= rect.x + radius &&
-        x <= rect.x + rect.w - radius &&
-        y >= rect.y + radius &&
-        y <= rect.y + rect.h - radius
-    );
+  // The complete player circle must remain inside at least one
+  // playable rectangle.
+  const insidePlayableArea = playableAreas.some((rect) =>
+    rectContainsCircle(rect, x, y, radius)
+  );
 
   if (!insidePlayableArea) {
     return false;
   }
 
-  const touchingObstacle =
-    OBSTACLES.some(
-      (obstacle) =>
-        x + radius > obstacle.x &&
-        x - radius <
-          obstacle.x + obstacle.w &&
-        y + radius > obstacle.y &&
-        y - radius <
-          obstacle.y + obstacle.h
-    );
-
-  if (touchingObstacle) {
-    return false;
+  // Do not allow the player to enter obstacles.
+  for (const obstacle of OBSTACLES) {
+    if (
+      circleIntersectsRect(
+        x,
+        y,
+        radius,
+        obstacle
+      )
+    ) {
+      return false;
+    }
   }
 
   return true;
 }
 
-// ------------------------------------------------------------
-// CLAMP PLAYER INTO WALKABLE SPACE
-// ------------------------------------------------------------
+// ============================================================
+// FIND NEAREST VALID POSITION
+// ============================================================
 
-function clampToWalkable(
-  x,
-  y,
-  radius = 14
-) {
-  if (
-    walkableAt(
-      x,
-      y,
-      radius
-    )
-  ) {
-    return {
-      x,
-      y,
-    };
+function clampToWalkable(x, y, radius = 14) {
+  if (walkableAt(x, y, radius)) {
+    return { x, y };
   }
 
-  const candidates = [];
-
-  const step = 8;
-
-  for (
-    let i = 1;
-    i <= 14;
-    i++
-  ) {
-    const distance =
-      i * step;
-
-    candidates.push(
-      {
-        x: x - distance,
-        y,
-      },
-      {
-        x: x + distance,
-        y,
-      },
-      {
-        x,
-        y: y - distance,
-      },
-      {
-        x,
-        y: y + distance,
-      },
-      {
-        x: x - distance,
-        y: y - distance,
-      },
-      {
-        x: x + distance,
-        y: y - distance,
-      },
-      {
-        x: x - distance,
-        y: y + distance,
-      },
-      {
-        x: x + distance,
-        y: y + distance,
-      }
-    );
-  }
+  // First search nearby with small increments.
+  const maxDistance = 160;
+  const step = 4;
 
   let best = null;
-
-  let bestDistance =
-    Infinity;
+  let bestDistance = Infinity;
 
   for (
-    const candidate of candidates
+    let distance = step;
+    distance <= maxDistance;
+    distance += step
   ) {
-    if (
-      !walkableAt(
-        candidate.x,
-        candidate.y,
-        radius
-      )
-    ) {
-      continue;
+    const candidates = [
+      { x: x - distance, y },
+      { x: x + distance, y },
+      { x, y: y - distance },
+      { x, y: y + distance },
+
+      { x: x - distance, y: y - distance },
+      { x: x + distance, y: y - distance },
+      { x: x - distance, y: y + distance },
+      { x: x + distance, y: y + distance },
+    ];
+
+    for (const candidate of candidates) {
+      if (!walkableAt(candidate.x, candidate.y, radius)) {
+        continue;
+      }
+
+      const d =
+        (candidate.x - x) ** 2 +
+        (candidate.y - y) ** 2;
+
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = candidate;
+      }
     }
 
-    const distance =
-      (candidate.x - x) ** 2 +
-      (candidate.y - y) ** 2;
-
-    if (
-      distance <
-      bestDistance
-    ) {
-      bestDistance =
-        distance;
-
-      best = candidate;
+    // Once we found a position at this distance, the next
+    // distance cannot produce a closer position.
+    if (best) {
+      break;
     }
   }
 
@@ -821,16 +734,36 @@ function clampToWalkable(
     return best;
   }
 
+  // Absolute fallback: use a known safe spawn.
+  for (const spawn of SPAWN_POINTS) {
+    if (walkableAt(spawn.x, spawn.y, radius)) {
+      return {
+        x: spawn.x,
+        y: spawn.y,
+      };
+    }
+  }
+
+  // This should never happen with the current map.
   return {
-    x,
-    y,
+    x: Math.max(
+      radius,
+      Math.min(WORLD.width - radius, x)
+    ),
+    y: Math.max(
+      radius,
+      Math.min(WORLD.height - radius, y)
+    ),
   };
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // COLLISION-AWARE MOVEMENT
-// Allows sliding along walls/objects.
-// ------------------------------------------------------------
+//
+// Horizontal and vertical movement are tested separately.
+// This allows the player to slide along walls instead of
+// getting completely stuck when moving diagonally.
+// ============================================================
 
 function resolvePlayerMovement(
   x,
@@ -842,40 +775,45 @@ function resolvePlayerMovement(
   let resolvedX = x;
   let resolvedY = y;
 
-  // Horizontal movement
+  // Keep movement inside the world itself.
+  nx = Math.max(
+    radius,
+    Math.min(WORLD.width - radius, nx)
+  );
 
-  if (
-    walkableAt(
-      nx,
-      y,
-      radius
-    )
-  ) {
+  ny = Math.max(
+    radius,
+    Math.min(WORLD.height - radius, ny)
+  );
+
+  // Try horizontal movement.
+  if (walkableAt(nx, y, radius)) {
     resolvedX = nx;
   }
 
-  // Vertical movement
-
-  if (
-    walkableAt(
-      resolvedX,
-      ny,
-      radius
-    )
-  ) {
+  // Try vertical movement using the resolved X.
+  if (walkableAt(resolvedX, ny, radius)) {
     resolvedY = ny;
   }
 
-  return clampToWalkable(
-    resolvedX,
-    resolvedY,
-    radius
-  );
+  // Final safety check.
+  if (!walkableAt(resolvedX, resolvedY, radius)) {
+    return clampToWalkable(
+      resolvedX,
+      resolvedY,
+      radius
+    );
+  }
+
+  return {
+    x: resolvedX,
+    y: resolvedY,
+  };
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // EXPORTS
-// ------------------------------------------------------------
+// ============================================================
 
 module.exports = {
   WORLD,

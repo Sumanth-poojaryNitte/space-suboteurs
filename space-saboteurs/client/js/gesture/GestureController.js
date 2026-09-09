@@ -27,14 +27,13 @@ const PINKY_PIP = 18;
 const LOST_HAND_TIMEOUT_MS = 350;
 
 // Lower values = slower / less sensitive.
-// Previous value was 3.2, which was too sensitive.
-const AMPLIFICATION_X = 1.15;
-const AMPLIFICATION_Y = 1.15;
+// Reduced from 1.15 to 0.85 for more controlled movement.
+const AMPLIFICATION_X = 0.85;
+const AMPLIFICATION_Y = 0.85;
 
 // Dead zone around calibrated hand position.
-// Increase this if the player still moves when your hand is
-// almost stationary.
-const DEAD_ZONE = 0.12;
+// Increased from 0.12 to 0.15 to reduce accidental movement.
+const DEAD_ZONE = 0.15;
 
 
 // ---------------------------------------------------------
@@ -48,7 +47,8 @@ export class GestureController {
     // Smoothing factor.
     // Lower = smoother/slower
     // Higher = faster/more responsive
-    this.smoother = new Vec2Smoother(0.25);
+    // Reduced from 0.25 to 0.18 for steadier movement.
+    this.smoother = new Vec2Smoother(0.18);
 
     // Neutral hand position captured during calibration.
     this.neutral = {
@@ -226,7 +226,7 @@ export class GestureController {
       palm.y - this.neutral.y;
 
 
-    // Apply moderate sensitivity.
+    // Apply reduced sensitivity.
     let rawX =
       handDeltaX * AMPLIFICATION_X;
 
